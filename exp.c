@@ -69,146 +69,54 @@ void parse_statement(char *statement)
 
     free_tokens(tokens);
 }
-//
-///* deals with '+, -' */
-//void exp_1(int *result)
-//{
-//    struct token_t *token;
-//
-//    int temp = 0;
-//
-//    exp_2(result);
-//
-//    token = get_token();
-//
-//    while(token && (token->token == TOKEN_PLUS || token->token == TOKEN_MINUS))
-//    {
-//        advance_token();
-//
-//        temp = 0;
-//
-//        exp_2(&temp);
-//
-//        switch(token->token)
+
+/* comma... */
+void expression7(struct exp_result_t *result)
+{
+    struct token_t *token;
+
+    struct exp_result_t temp;
+    //char error_buffer[128];
+    int temp_value;
+
+    expression6(result);
+
+    token = get_token();
+
+    while(token && (token->token == TOKEN_COMMA))
+    {
+        advance_token();
+        expression6(&temp);
+
+        result->result_type = temp.result_type;
+        result->result_value = temp.result_value;
+        strcpy(result->text, temp.text);
+
+//        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
 //        {
-//            case TOKEN_PLUS:
-//                (*result) += temp;
-//            break;
-//
-//            case TOKEN_MINUS:
-//                (*result) -= temp;
-//            break;
-//        }
-//
-//        token = get_token();
-//    }
-//}
-//
-///* deals with '/, *' */
-//void exp_2(int *result)
-//{
-//    struct token_t *token;
-//
-//    int temp;
-//
-//    exp_3(result);
-//
-//    token = get_token();
-//
-//    while(token && (token->token == TOKEN_MUL || token->token == TOKEN_DIV))
-//    {
-//        advance_token();
-//
-//        temp = 0;
-//
-//        exp_3(&temp);
-//
-//        switch(token->token)
-//        {
-//            case TOKEN_MUL:
-//                (*result) *= temp;
-//            break;
-//
-//            case TOKEN_DIV:
-//                (*result) /= temp;
-//            break;
-//        }
-//
-//        token = get_token();
-//    }
-//}
-//
-///* unary - and + */
-//void exp_3(int *result)
-//{
-//    struct token_t *token;
-//
-//    token = get_token();
-//
-//    int token_type = TOKEN_UNKNOWN;
-//
-//    if(token)
-//    {
-//        while(token->token == TOKEN_PLUS || token->token == TOKEN_MINUS)
-//        {
-//            switch(token->token)
+//            if(!temp.result_value.var)
 //            {
-//                case TOKEN_MINUS:
-//                    token_type = token_type == TOKEN_MINUS ? TOKEN_UNKNOWN : TOKEN_MINUS;
-//                break;
+//                result->result_type = EXP_RESULT_TYPE_ERROR;
+//                sprintf(result->text, "undefined identifier [%s]", temp.text);
 //            }
-//
-//            advance_token();
-//            token = get_token();
+//            else
+//            {
+//                temp_value = temp.result_value.var->value.ivalue;
+//            }
 //        }
-//    }
+//        else
+//        {
+//            temp_value = temp.result_value.int_result;
+//        }
 //
-//    exp_4(result);
 //
-//    switch(token_type)
-//    {
-//        case TOKEN_MINUS:
-//            *result = -*result;
-//        break;
-//    }
-//}
-//
-///* parenthesis... */
-//void exp_4(int *result)
-//{
-//    struct token_t *token;
-//
-//    token = get_token();
-//    advance_token();
-//
-//    if(token->token == TOKEN_OPARENTHESIS)
-//    {
-//        exp_1(result);
-//        advance_token();
-//    }
-//    else
-//    {
-//        *result = atoi(token->text);
-//    }
-//}
+//        result->result_type = EXP_RESULT_TYPE_LITERAL;
+//        result->result_value.int_result = temp_value;
 
+        token = get_token();
+    }
+}
 
-//void parse_statement(char *statement)
-//{
-//    struct token_t *token;
-//    struct exp_result_t *result;
-//
-//    tokenize(statement);
-//
-//    token = get_token();
-//
-//    while(token && token->token == TOKEN_SEMICOLON)
-//    {
-//        expression6()
-//
-//        token = get_token();
-//    }
-//}
 
 /* assignments... */
 void expression6(struct exp_result_t *result)
@@ -222,7 +130,7 @@ void expression6(struct exp_result_t *result)
 
     char error_buffer[128];
 
-    expression5(result);
+    expression4(result);
 
     token = get_token();
 
@@ -232,7 +140,7 @@ void expression6(struct exp_result_t *result)
                                                                                         token->token == TOKEN_DIV_ASSIGN)))
     {
         advance_token();
-        expression5(&temp);
+        expression6(&temp);
 
         /* left side exp... */
         if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
@@ -315,7 +223,7 @@ void expression5(struct exp_result_t *result)
 
     token = get_token();
 
-    if(token && (token->token != TOKEN_SEMICOLON && token->token == TOKEN_RESERVED))
+    while(token && (token->token != TOKEN_SEMICOLON && token->token == TOKEN_RESERVED))
     {
         advance_token();
 
@@ -354,7 +262,6 @@ void expression5(struct exp_result_t *result)
                 result->result_type = EXP_RESULT_TYPE_ERROR;
                 sprintf(result->text, "identifier starting with number");
             break;
-
         }
 
         return;
@@ -380,7 +287,6 @@ void expression4(struct exp_result_t *result)
     {
         advance_token();
         expression3(&temp);
-
 
         if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
         {
@@ -648,6 +554,9 @@ void expression0(struct exp_result_t *result)
     struct token_t *token;
     struct var_t *var;
 
+    struct exp_result_t temp;
+    int var_type;
+
     token = get_token();
 
     if(token && token->token != TOKEN_SEMICOLON)
@@ -655,7 +564,7 @@ void expression0(struct exp_result_t *result)
         if(token->token == TOKEN_OPARENTHESIS)
         {
             advance_token();
-            expression6(result);
+            expression7(result);
             advance_token();
         }
         else
@@ -674,6 +583,62 @@ void expression0(struct exp_result_t *result)
                 result->result_value.var = var;
                 strcpy(result->text, token->text);
                 advance_token();
+            }
+            else if(token->token == TOKEN_RESERVED)
+            {
+                switch(token->reserved_token)
+                {
+                    case RESERVED_TOKEN_INT:
+                    case RESERVED_TOKEN_SHORT:
+                    case RESERVED_TOKEN_CHAR:
+                        do
+                        {
+                            advance_token();
+                            expression0(&temp);
+
+                            switch(temp.result_type)
+                            {
+                                case EXP_RESULT_TYPE_VARIABLE:
+                                    if(!temp.result_value.var)
+                                    {
+                                        /* var declaration... */
+
+                                        switch(token->reserved_token)
+                                        {
+                                            case RESERVED_TOKEN_INT:
+                                                var_type = VAR_TYPE_INT;
+                                            break;
+                                        }
+
+                                        create_var(temp.text, var_type);
+
+                                        var = get_var(temp.text);
+
+                                        result->result_type = EXP_RESULT_TYPE_VARIABLE;
+                                        result->result_value.var = var;
+                                        strcpy(result->text, temp.text);
+
+                                        expression6(result);
+                                    }
+                                    else
+                                    {
+                                        result->result_type = EXP_RESULT_TYPE_ERROR;
+                                        sprintf(result->text, "redeclaration of identifier [%s]", temp.text);
+                                    }
+                                break;
+
+                                case EXP_RESULT_TYPE_LITERAL:
+                                    result->result_type = EXP_RESULT_TYPE_ERROR;
+                                    sprintf(result->text, "identifier starting with number");
+                                break;
+                            }
+
+                            token = get_token();
+
+                        }while(token && (token->token == TOKEN_COMMA));
+
+                    break;
+                }
             }
         }
     }
