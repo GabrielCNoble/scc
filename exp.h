@@ -31,19 +31,6 @@ struct token_t *get_token();
 
 void advance_token();
 
-//void exp_start(struct token_t *tokens);
-//
-//void exp_0(int *result);
-//
-//void exp_1(int *result);
-//
-//void exp_2(int *result);
-//
-//void exp_3(int *result);
-//
-//void exp_4(int *result);
-
-
 void parse_statement(char *statement);
 
 void expression0(struct exp_result_t *result);

@@ -38,7 +38,7 @@ void parse_statement(char *statement)
 
     do
     {
-        expression6(&result);
+        expression7(&result);
         token = get_token();
 
         if((!token) || token->token != TOKEN_SEMICOLON)
@@ -86,32 +86,12 @@ void expression7(struct exp_result_t *result)
     while(token && (token->token == TOKEN_COMMA))
     {
         advance_token();
-        expression6(&temp);
+        expression7(&temp);
 
-        result->result_type = temp.result_type;
-        result->result_value = temp.result_value;
-        strcpy(result->text, temp.text);
-
-//        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!temp.result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(result->text, "undefined identifier [%s]", temp.text);
-//            }
-//            else
-//            {
-//                temp_value = temp.result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            temp_value = temp.result_value.int_result;
-//        }
-//
-//
-//        result->result_type = EXP_RESULT_TYPE_LITERAL;
-//        result->result_value.int_result = temp_value;
+        /* the comma operator pretty much just throws the temp value away,
+        given that the expression is processed left-to-right, but the comma
+        is right-to-left associative, which means the first thing read before
+        the first comma is the final value of the expression... */
 
         token = get_token();
     }
