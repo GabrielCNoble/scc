@@ -32,17 +32,17 @@ void token_init()
 
     char_map['_'] = CHAR_LETTER;
 
-    char_map['+'] = CHAR_PLUS;
-    char_map['-'] = CHAR_MINUS;
-    char_map['/'] = CHAR_BAR;
-    char_map['*'] = CHAR_ASTERISC;
-    char_map[';'] = CHAR_SEMICOLON;
-    char_map['('] = CHAR_OPARENTHESIS;
-    char_map[')'] = CHAR_CPARENTHESIS;
+    char_map['+'] = CHAR_SEPARATOR;
+    char_map['-'] = CHAR_SEPARATOR;
+    char_map['/'] = CHAR_SEPARATOR;
+    char_map['*'] = CHAR_SEPARATOR;
+    char_map[';'] = CHAR_SEPARATOR;
+    char_map['('] = CHAR_SEPARATOR;
+    char_map[')'] = CHAR_SEPARATOR;
     char_map[' '] = CHAR_SPACE;
-    char_map[','] = CHAR_COMMA;
-    char_map['='] = CHAR_EQUALS;
-    char_map['!'] = CHAR_EXCLAMATION;
+    char_map[','] = CHAR_SEPARATOR;
+    char_map['='] = CHAR_SEPARATOR;
+    char_map['!'] = CHAR_SEPARATOR;
 
 
 
@@ -83,167 +83,177 @@ struct token_t *tokenize(char *text)
 
     while(text[i])
     {
-        int char_type = char_map[(int)text[i]];
+        //int char_type = char_map[(int)text[i]];
 
-        switch(char_type)
+        token_text[0] = '\0';
+        token_text_index = 0;
+        switch(char_map[(int)text[i]])
         {
             case CHAR_NUMBER:
                 token_type = TOKEN_NUMBER;
+
+                while(char_map[(int)text[i]] & CHAR_NUMBER)
+                {
+                    token_text[token_text_index] = text[i];
+                    i++;
+                    token_text_index++;
+                }
+
+                token_text[token_text_index] = '\0';
+
             break;
 
             case CHAR_LETTER:
                 token_type = TOKEN_ID;
+
+                while(char_map[(int)text[i]] & (CHAR_LETTER | CHAR_NUMBER))
+                {
+                    token_text[token_text_index] = text[i];
+                    i++;
+                    token_text_index++;
+                }
+
+                token_text[token_text_index] = '\0';
+
+                j = RESERVED_TOKEN_FOR;
+                /* check to see whether this is a reserved keyword... */
+                for(j = RESERVED_TOKEN_FOR; j < RESERVED_TOKEN_UNKNOWN; j++)
+                {
+                    if(!strcmp(reserved[j], token_text))
+                    {
+                        token_type = TOKEN_RESERVED;
+                        reserved_token_type = j;
+                        /* yup... */
+                        break;
+                    }
+                }
+
             break;
 
-            case CHAR_PLUS:
-
-                i++;
+            case CHAR_SEPARATOR:
 
                 switch(text[i])
                 {
                     case '+':
                         i++;
-                        token_type = TOKEN_INCREMENT;
+
+                        if(text[i] == '+')
+                        {
+                            i++;
+                            token_type = TOKEN_INCREMENT;
+                        }
+                        else if(text[i] == '=')
+                        {
+                            i++;
+                            token_type = TOKEN_PLUS_ASSIGN;
+                        }
+                        else
+                        {
+                            token_type = TOKEN_PLUS;
+                        }
+
                     break;
 
-                    case '=':
-                        i++;
-                        token_type = TOKEN_PLUS_ASSIGN;
-                    break;
-
-                    default:
-                        token_type = TOKEN_PLUS;
-                    break;
-                }
-
-                goto _add_new_token;
-            break;
-
-            case CHAR_MINUS:
-
-                i++;
-
-                switch(text[i])
-                {
                     case '-':
                         i++;
-                        token_type = TOKEN_DECREMENT;
+
+                        if(text[i] == '-')
+                        {
+                            i++;
+                            token_type = TOKEN_DECREMENT;
+                        }
+                        else if(text[i] == '=')
+                        {
+                            i++;
+                            token_type = TOKEN_MINUS_ASSIGN;
+                        }
+                        else
+                        {
+                            token_type = TOKEN_MINUS;
+                        }
+                    break;
+
+                    case '*':
+                        i++;
+
+                        if(text[i] == '=')
+                        {
+                            i++;
+                            token_type = TOKEN_MUL_ASSIGN;
+                        }
+                        else
+                        {
+                            token_type = TOKEN_ASTERISC;
+                        }
+
+                    break;
+
+                    case '/':
+                        i++;
+
+                        if(text[i] == '=')
+                        {
+                            i++;
+                            token_type = TOKEN_DIV_ASSIGN;
+                        }
+                        else
+                        {
+                            token_type = TOKEN_DIV;
+                        }
                     break;
 
                     case '=':
                         i++;
-                        token_type = TOKEN_MINUS_ASSIGN;
+
+                        if(text[i] == '=')
+                        {
+                            i++;
+                            token_type = TOKEN_EQUALS;
+                        }
+                        else
+                        {
+                            token_type = TOKEN_ASSIGN;
+                        }
                     break;
 
-                    default:
-                        token_type = TOKEN_MINUS;
-                    break;
-                }
-
-                goto _add_new_token;
-            break;
-
-            case CHAR_BAR:
-
-                i++;
-
-                switch(text[i])
-                {
-                    case '=':
+                    case '(':
                         i++;
-                        token_type = TOKEN_DIV_ASSIGN;
+                        token_type = TOKEN_OPARENTHESIS;
                     break;
 
-                    default:
-                        token_type = TOKEN_DIV;
-                    break;
-                }
-
-                goto _add_new_token;
-            break;
-
-            case CHAR_ASTERISC:
-
-                i++;
-
-                switch(text[i])
-                {
-                    case '=':
+                    case ')':
                         i++;
-                        token_type = TOKEN_MUL_ASSIGN;
+                        token_type = TOKEN_CPARENTHESIS;
                     break;
 
-                    default:
-                        token_type = TOKEN_MUL;
-                    break;
-                }
-
-                goto _add_new_token;
-            break;
-
-            case CHAR_OPARENTHESIS:
-                token_type = TOKEN_OPARENTHESIS;
-                i++;
-                goto _add_new_token;
-            break;
-
-            case CHAR_CPARENTHESIS:
-                token_type = TOKEN_CPARENTHESIS;
-                i++;
-                goto _add_new_token;
-            break;
-
-            case CHAR_COMMA:
-                token_type = TOKEN_COMMA;
-                i++;
-                goto _add_new_token;
-            break;
-
-            case CHAR_EQUALS:
-                i++;
-
-                switch(text[i])
-                {
-                    case '=':
+                    case ',':
                         i++;
-                        token_type = TOKEN_EQUALS;
+                        token_type = TOKEN_COMMA;
                     break;
 
-                    default:
-                        token_type = TOKEN_ASSIGN;
-                    break;
-                }
-
-                goto _add_new_token;
-            break;
-
-            case CHAR_EXCLAMATION:
-                i++;
-
-                switch(text[i])
-                {
-                    case '=':
+                    case ';':
                         i++;
-                        token_type = TOKEN_NOT_EQUALS;
+                        token_type = TOKEN_SEMICOLON;
                     break;
 
-                    default:
-                        token_type = TOKEN_LOGICAL_NOT;
+                    case '!':
+                        i++;
+
+                        if(text[i] == '=')
+                        {
+                            i++;
+                            token_type = TOKEN_NOT_EQUALS;
+                        }
+                        else
+                        {
+                            token_type = TOKEN_LOGICAL_NOT;
+                        }
                     break;
                 }
-
-                goto _add_new_token;
             break;
-
-            case CHAR_SEMICOLON:
-                i++;
-                token_type = TOKEN_SEMICOLON;
-                goto _add_new_token;
-            break;
-
-
 
             case CHAR_UNKNOWN:
+                i++;
                 token_type = TOKEN_UNKNOWN;
             break;
 
@@ -257,38 +267,6 @@ struct token_t *tokenize(char *text)
                 continue;
             break;
         }
-
-        token_text_index = 0;
-
-        while(char_map[(int)text[i]] == char_type)
-        {
-            token_text[token_text_index] = text[i];
-
-            i++;
-            token_text_index++;
-        }
-
-        token_text[token_text_index] = '\0';
-
-
-        if(token_type == TOKEN_ID)
-        {
-            j = RESERVED_TOKEN_FOR;
-
-            while(reserved[j])
-            {
-                if(!strcmp(reserved[j], token_text))
-                {
-                    token_type = TOKEN_RESERVED;
-                    reserved_token_type = j;
-                    break;
-                }
-
-                j++;
-            }
-        }
-
-        _add_new_token:
 
         new_token = calloc(sizeof(struct token_t), 1);
 
@@ -354,8 +332,8 @@ void translate_tokens(struct token_t *token)
                 printf("TOKEN_DIV\n");
             break;
 
-            case TOKEN_MUL:
-                printf("TOKEN_MUL\n");
+            case TOKEN_ASTERISC:
+                printf("TOKEN_ASTERISC\n");
             break;
 
             case TOKEN_OPARENTHESIS:

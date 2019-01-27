@@ -55,15 +55,15 @@ void parse_statement(char *statement)
     {
         if(result.result_type == EXP_RESULT_TYPE_VARIABLE)
         {
-            printf("--%d\n", result.result_value.var->value.ivalue);
+            printf("-->%d\n", result.result_value.var->value.ivalue);
         }
         else if(result.result_type == EXP_RESULT_TYPE_LITERAL)
         {
-            printf("--%d\n", result.result_value.int_result);
+            printf("-->%d\n", result.result_value.int_result);
         }
         else
         {
-            printf("--%s\n", result.text);
+            printf("-->%s\n", result.text);
         }
     }
 
@@ -226,33 +226,21 @@ void expression6(struct exp_result_t *result)
 
     token = get_token();
 
-    while(token && (token->token != TOKEN_SEMICOLON && token->token == TOKEN_ASSIGN))
+    while(token && (token->token != TOKEN_SEMICOLON && (token->token == TOKEN_ASSIGN || token->token == TOKEN_PLUS_ASSIGN ||
+                                                                                        token->token == TOKEN_MINUS_ASSIGN ||
+                                                                                        token->token == TOKEN_MUL_ASSIGN ||
+                                                                                        token->token == TOKEN_DIV_ASSIGN)))
     {
         advance_token();
         expression5(&temp);
 
+        /* left side exp... */
         if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
         {
-            if(result->result_value.var)
-            {
-                if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-                {
-                    temp_value = temp.result_value.var->value.ivalue;
-                }
-                else
-                {
-                    temp_value = temp.result_value.int_result;
-                }
-
-                result->result_value.var->value.ivalue = temp_value;
-
-                result->result_type = EXP_RESULT_TYPE_LITERAL;
-                result->result_value.int_result = temp_value;
-            }
-            else
+            if(!result->result_value.var)
             {
                 result->result_type = EXP_RESULT_TYPE_ERROR;
-                sprintf(error_buffer, "undeclared identifier [%s], motherfucker!", result->text);
+                sprintf(error_buffer, "undefined identifier [%s]", result->text);
                 strcpy(result->text, error_buffer);
                 return;
             }
@@ -260,9 +248,55 @@ void expression6(struct exp_result_t *result)
         else if(result->result_type == EXP_RESULT_TYPE_LITERAL)
         {
             result->result_type = EXP_RESULT_TYPE_ERROR;
-            sprintf(result->text, "invalid lvalue, asshole!");
+            sprintf(result->text, "literal cannot be lvalue");
             return;
         }
+
+
+        /* right exp... */
+        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
+        {
+            if(!temp.result_value.var)
+            {
+                result->result_type = EXP_RESULT_TYPE_ERROR;
+                sprintf(result->text, "undefined identifier [%s]", temp.text);
+                return;
+            }
+            else
+            {
+                temp_value = temp.result_value.var->value.ivalue;
+            }
+        }
+        else
+        {
+            temp_value = temp.result_value.int_result;
+        }
+
+        switch(token->token)
+        {
+            case TOKEN_ASSIGN:
+                result->result_value.var->value.ivalue = temp_value;
+            break;
+
+            case TOKEN_PLUS_ASSIGN:
+                result->result_value.var->value.ivalue += temp_value;
+            break;
+
+            case TOKEN_MINUS_ASSIGN:
+                result->result_value.var->value.ivalue -= temp_value;
+            break;
+
+            case TOKEN_MUL_ASSIGN:
+                result->result_value.var->value.ivalue *= temp_value;
+            break;
+
+            case TOKEN_DIV_ASSIGN:
+                result->result_value.var->value.ivalue /= temp_value;
+            break;
+        }
+
+        result->result_type = EXP_RESULT_TYPE_LITERAL;
+        result->result_value.int_result = result->result_value.var->value.ivalue;
 
         token = get_token();
     }
@@ -281,9 +315,10 @@ void expression5(struct exp_result_t *result)
 
     token = get_token();
 
-    while(token && (token->token != TOKEN_SEMICOLON && token->token == TOKEN_RESERVED))
+    if(token && (token->token != TOKEN_SEMICOLON && token->token == TOKEN_RESERVED))
     {
         advance_token();
+
         expression4(&temp_result);
 
         switch(temp_result.result_type)
@@ -307,27 +342,22 @@ void expression5(struct exp_result_t *result)
                     result->result_type = EXP_RESULT_TYPE_VARIABLE;
                     result->result_value.var = var;
                     strcpy(result->text, temp_result.text);
-                    return;
                 }
                 else
                 {
                     result->result_type = EXP_RESULT_TYPE_ERROR;
-                    sprintf(result->text, "redeclaration of identifier %s, you moron!", temp_result.text);
-                    return;
+                    sprintf(result->text, "redeclaration of identifier [%s]", temp_result.text);
                 }
             break;
 
             case EXP_RESULT_TYPE_LITERAL:
                 result->result_type = EXP_RESULT_TYPE_ERROR;
-                sprintf(result->text, "identifier starting with number, you fucker!");
-                return;
+                sprintf(result->text, "identifier starting with number");
             break;
 
         }
 
-        advance_token();
-
-        token = get_token();
+        return;
     }
 }
 
@@ -337,8 +367,10 @@ void expression4(struct exp_result_t *result)
     struct token_t *token;
 
     struct exp_result_t temp;
+    char error_buffer[128];
 
     int result_value;
+    int temp_value;
 
     expression3(result);
 
@@ -349,37 +381,59 @@ void expression4(struct exp_result_t *result)
         advance_token();
         expression3(&temp);
 
+
+        if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
+        {
+            if(!result->result_value.var)
+            {
+                result->result_type = EXP_RESULT_TYPE_ERROR;
+                sprintf(error_buffer, "undefined identifier [%s]", result->text);
+                strcpy(result->text, error_buffer);
+            }
+            else
+            {
+                result_value = result->result_value.var->value.ivalue;
+            }
+        }
+        else
+        {
+            result_value = result->result_value.int_result;
+        }
+
+
+
+        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
+        {
+            if(!temp.result_value.var)
+            {
+                result->result_type = EXP_RESULT_TYPE_ERROR;
+                sprintf(result->text, "undefined identifier [%s]", temp.text);
+            }
+            else
+            {
+                temp_value = temp.result_value.var->value.ivalue;
+            }
+        }
+        else
+        {
+            temp_value = temp.result_value.int_result;
+        }
+
+
+
         switch(token->token)
         {
             case TOKEN_EQUALS:
-                if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-                {
-                    result_value = result_value == temp.result_value.var->value.ivalue;
-                }
-                else
-                {
-                    result_value = result_value == temp.result_value.int_result;
-                }
-
-                result->result_type = EXP_RESULT_TYPE_LITERAL;
-                result->result_value.int_result = result_value;
-
+                result_value = result_value == temp_value;
             break;
 
             case TOKEN_NOT_EQUALS:
-                if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-                {
-                    result_value = result_value != temp.result_value.var->value.ivalue;
-                }
-                else
-                {
-                    result_value = result_value != temp.result_value.int_result;
-                }
-
-                result->result_type = EXP_RESULT_TYPE_LITERAL;
-                result->result_value.int_result = result_value;
+                result_value = result_value != temp_value;
             break;
         }
+
+        result->result_type = EXP_RESULT_TYPE_LITERAL;
+        result->result_value.int_result = result_value;
 
         token = get_token();
     }
@@ -391,9 +445,12 @@ void expression3(struct exp_result_t *result)
     struct token_t *token;
     struct exp_result_t temp;
 
+    char error_buffer[128];
+
     expression2(result);
 
     int result_value;
+    int temp_value;
 
     token = get_token();
 
@@ -402,42 +459,58 @@ void expression3(struct exp_result_t *result)
         advance_token();
         expression2(&temp);
 
+
+
         if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
         {
-            result_value = result->result_value.var->value.ivalue;
+            if(!result->result_value.var)
+            {
+                result->result_type = EXP_RESULT_TYPE_ERROR;
+                sprintf(error_buffer, "undefined identifier [%s]", result->text);
+                strcpy(result->text, error_buffer);
+            }
+            else
+            {
+                result_value = result->result_value.var->value.ivalue;
+            }
+        }
+        else
+        {
+            result_value = result->result_value.int_result;
+        }
+
+
+
+        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
+        {
+            if(!temp.result_value.var)
+            {
+                result->result_type = EXP_RESULT_TYPE_ERROR;
+                sprintf(result->text, "undefined identifier [%s]", temp.text);
+            }
+            else
+            {
+                temp_value = temp.result_value.var->value.ivalue;
+            }
+        }
+        else
+        {
+            temp_value = temp.result_value.int_result;
         }
 
         switch(token->token)
         {
             case TOKEN_PLUS:
-                if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-                {
-                    result_value += temp.result_value.var->value.ivalue;
-                }
-                else
-                {
-                    result_value += temp.result_value.int_result;
-                }
-
-                result->result_type = EXP_RESULT_TYPE_LITERAL;
-                result->result_value.int_result = result_value;
-
+                result_value += temp_value;
             break;
 
             case TOKEN_MINUS:
-                if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-                {
-                    result_value -= temp.result_value.var->value.ivalue;
-                }
-                else
-                {
-                    result_value -= temp.result_value.int_result;
-                }
-
-                result->result_type = EXP_RESULT_TYPE_LITERAL;
-                result->result_value.int_result = result_value;
+                result_value -= temp_value;
             break;
         }
+
+        result->result_type = EXP_RESULT_TYPE_LITERAL;
+        result->result_value.int_result = result_value;
 
         token = get_token();
     }
@@ -449,52 +522,72 @@ void expression2(struct exp_result_t *result)
     struct token_t *token;
     struct exp_result_t temp;
 
+    char error_buffer[128];
+
     int result_value;
+    int temp_value;
 
     expression1(result);
 
     token = get_token();
 
-    while(token && (token->token != TOKEN_SEMICOLON && (token->token == TOKEN_MUL || token->token == TOKEN_DIV)))
+    while(token && (token->token != TOKEN_SEMICOLON && (token->token == TOKEN_ASTERISC || token->token == TOKEN_DIV)))
     {
         advance_token();
         expression1(&temp);
 
+
+
         if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
         {
-            result_value = result->result_value.var->value.ivalue;
+            if(!result->result_value.var)
+            {
+                result->result_type = EXP_RESULT_TYPE_ERROR;
+                sprintf(error_buffer, "undefined identifier [%s]", result->text);
+                strcpy(result->text, error_buffer);
+            }
+            else
+            {
+                result_value = result->result_value.var->value.ivalue;
+            }
+        }
+        else
+        {
+            result_value = result->result_value.int_result;
+        }
+
+
+
+        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
+        {
+            if(!temp.result_value.var)
+            {
+                result->result_type = EXP_RESULT_TYPE_ERROR;
+                sprintf(result->text, "undefined identifier [%s]", temp.text);
+            }
+            else
+            {
+                temp_value = temp.result_value.var->value.ivalue;
+            }
+        }
+        else
+        {
+            temp_value = temp.result_value.int_result;
         }
 
         switch(token->token)
         {
-            case TOKEN_MUL:
-                if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-                {
-                    result_value *= temp.result_value.var->value.ivalue;
-                }
-                else
-                {
-                    result_value *= temp.result_value.int_result;
-                }
-
-                result->result_type = EXP_RESULT_TYPE_LITERAL;
-                result->result_value.int_result = result_value;
+            case TOKEN_ASTERISC:
+                result_value *= temp_value;
             break;
 
             case TOKEN_DIV:
-                if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-                {
-                    result_value /= temp.result_value.var->value.ivalue;
-                }
-                else
-                {
-                    result_value /= temp.result_value.int_result;
-                }
-
-                result->result_type = EXP_RESULT_TYPE_LITERAL;
-                result->result_value.int_result = result_value;
+                result_value /= temp_value;
             break;
         }
+
+        result->result_type = EXP_RESULT_TYPE_LITERAL;
+        result->result_value.int_result = result_value;
 
         token = get_token();
     }
@@ -504,6 +597,9 @@ void expression2(struct exp_result_t *result)
 void expression1(struct exp_result_t *result)
 {
     struct token_t *token;
+    int result_value;
+
+    char error_buffer[128];
 
     int token_type = TOKEN_UNKNOWN;
 
@@ -521,7 +617,28 @@ void expression1(struct exp_result_t *result)
 
     if(token_type == TOKEN_MINUS)
     {
-        result->result_value.int_result = -result->result_value.int_result;
+        if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
+        {
+            if(!result->result_value.var)
+            {
+                result->result_type = EXP_RESULT_TYPE_ERROR;
+                sprintf(error_buffer, "undefined identifier [%s]", result->text);
+                strcpy(result->text, error_buffer);
+                return;
+            }
+            else
+            {
+                result_value = result->result_value.var->value.ivalue;
+            }
+        }
+        else
+        {
+            result_value = result->result_value.int_result;
+        }
+
+        result_value = -result_value;
+        result->result_type = EXP_RESULT_TYPE_LITERAL;
+        result->result_value.int_result = result_value;
     }
 }
 
