@@ -47,7 +47,7 @@ void expression5(struct exp_result_t *result);
 
 void expression6(struct exp_result_t *result);
 
-
+void expression7(struct exp_result_t *result);
 
 
 #endif // EXP_H
