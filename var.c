@@ -78,13 +78,7 @@ void clear_vars()
     }
 }
 
-struct var_value_t value_from_str(char *str)
-{
-    struct var_value_t value;
 
-    value.var_type = VAR_TYPE_INT;
-    value.ivalue = atoi(str);
-}
 
 
 

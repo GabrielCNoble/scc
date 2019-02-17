@@ -7,7 +7,14 @@ enum VAR_TYPE
 {
     VAR_TYPE_INT = 0,
     VAR_TYPE_FLOAT,
+
+    VAR_TYPE_AGGRETAGE,
+    VAR_TYPE_FUNCTION,
+    VAR_TYPE_POINTER,
 };
+
+
+
 
 
 struct var_value_t
@@ -17,6 +24,7 @@ struct var_value_t
     {
         int ivalue;
         float fvalue;
+        void *ptrvalue;
     };
 };
 
@@ -25,6 +33,7 @@ struct var_t
 {
     struct var_t *next;
     char id[64];
+
     int type;
     struct var_value_t value;
 };
