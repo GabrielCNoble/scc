@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 
@@ -62,6 +63,11 @@ int is_storage_class_specifier(struct token_t *token)
         }
     }
 
+    return 0;
+}
+
+int is_typedef_name(struct token_t *token)
+{
     return 0;
 }
 
@@ -177,111 +183,160 @@ void advance_token(struct parser_t *parser)
 }
 
 
-void translate_type(struct base_type_t *type, int verbose)
+void translate_type(struct reference_type_t *type, int single_reference)
 {
     struct identifier_type_t *identifier;
     struct function_type_t *function;
-    struct base_type_t *params;
+    struct reference_type_t *param_or_field;
+    struct base_type_t *base_type;
+    struct aggretage_type_t *aggretage_type;
 
     while(type)
     {
-        switch(type->type)
+        base_type = type->type;
+
+        while(base_type)
         {
-            case TYPE_IDENTIFIER:
-                identifier = (struct identifier_type_t *)type;
-                if(verbose)
-                {
+            switch(base_type->type)
+            {
+                case TYPE_IDENTIFIER:
+                    identifier = (struct identifier_type_t *)base_type;
                     printf("[%s] is ", identifier->identifier);
-                }
-                else
-                {
-                    printf("[%s] ", identifier->identifier);
-                }
+                break;
 
-            break;
-
-            case TYPE_POINTER:
-
-                if(verbose)
-                {
+                case TYPE_POINTER:
                     printf("a pointer to ");
-                }
-                else
-                {
-                    printf("* ");
-                }
+                break;
 
-            break;
+                case TYPE_FUNCTION:
+                    function = (struct function_type_t *)base_type;
 
-            case TYPE_FUNCTION:
-                function = (struct function_type_t *)type;
+                    printf("a function (");
 
-                printf("a function (");
+                    param_or_field = function->params;
 
-                params = function->params;
-
-                while(params)
-                {
-                    translate_type(params, 1);
-
-                    while(params && params->type != TYPE_UNKNOWN)
+                    while(param_or_field)
                     {
-                        params = params->next;
+                        translate_type(param_or_field, 1);
+
+                        param_or_field = (struct reference_type_t *)param_or_field->base.next;
+
+                        if(param_or_field)
+                        {
+                            printf(", ");
+                        }
                     }
 
-                    params = params->next;
+                    printf("), returning ");
+                break;
 
-                    if(params)
+                case TYPE_STRUCT:
+                    aggretage_type = (struct aggretage_type_t *)base_type;
+
+                    if(aggretage_type->name)
                     {
-                        printf(", ");
+                        printf("a struct [%s] {", aggretage_type->name);
                     }
-                }
+                    else
+                    {
+                        printf("an anonymous struct {");
+                    }
 
-                printf("), returning ");
-            break;
+                    param_or_field = aggretage_type->fields;
 
-            case TYPE_INT:
-                if(verbose)
-                {
-                    printf("an int ");
-                }
-                else
-                {
-                    printf("int");
-                }
+                    while(param_or_field)
+                    {
+                        translate_type(param_or_field, 1);
 
-            break;
+                        param_or_field = param_or_field->base.next;
 
-            case TYPE_VOID:
-                printf("void ");
-            break;
+                        if(param_or_field)
+                        {
+                            printf(", ");
+                        }
+                    }
 
-            case TYPE_SHORT:
-                if(verbose)
-                {
-                    printf("a short ");
-                }
-                else
-                {
-                    printf("short");
-                }
+                    printf("}, ");
 
-            break;
 
-            case TYPE_CHAR:
-                printf("a char ");
-            break;
+                break;
 
-            default:
-                return;
-            break;
+                case TYPE_INT:
+                    printf("an int");
+                break;
+
+                case TYPE_FLOAT:
+                    printf("a float");
+                break;
+
+                case TYPE_DOUBLE:
+                    printf("a double");
+                break;
+
+                case TYPE_VOID:
+                    printf("void");
+                break;
+
+                case TYPE_SHORT:
+                    printf("a short");
+                break;
+
+                case TYPE_CHAR:
+                    printf("a char");
+                break;
+
+                default:
+                    return;
+                break;
+            }
+
+            base_type = base_type->next;
         }
 
-        type = type->next;
+        type = single_reference ? NULL : (struct reference_type_t *)type->base.next;
     }
 
-    printf("\n");
+    //printf("\n");
 }
+
+void stash_aggregate_type(struct parser_t *parser, struct aggretage_type_t *type)
+{
+    struct aggretage_type_t *copy;
+
+    copy = calloc(sizeof(struct aggretage_type_t), 1);
+
+    copy->fields = type->fields;
+    copy->name = type->name;
+
+    copy->base.next = (struct base_type_t *)parser->aggregate_types;
+    parser->aggregate_types = copy;
+}
+
+
+struct base_type_t *stash_typedef_type(struct parser_t *parser, struct base_type_t *type)
+{
+
+}
+
+struct base_type_t *get_aggregate_type(struct parser_t *parser, char *name)
+{
+//    struct aggretage_type_t *types;
+//
+//    types = parser->aggregate_types;
+//
+//    while(types)
+//    {
+//
+//    }
+
+    return NULL;
+}
+
+/*void push_type(struct parser_t *parser, struct base_type_t *type)
+{
+    parser->decl_stack[parser->decl_stack_depth] = type;
+    parser->decl_stack_depth++;
+}*/
 
 #define DECL_MAX_DEPTH 8192
 
@@ -290,19 +345,18 @@ void parse_tokens(struct token_t *tokens)
     struct token_t *token;
     struct parser_t parser;
 
-    //parser.state = PARSER_STATE_NONE;
+    memset(&parser, 0, sizeof(struct parser_t));
 
     parser.tokens = tokens;
     parser.current_token = tokens;
-    parser.prev_token = NULL;
 
-    parser.param_list_level = 0;
+   // parser.decl_stack = calloc(sizeof(struct base_type_t *), DECL_MAX_DEPTH);
 
     while(parser.current_token->token_type != TOKEN_EOF)
     {
         if(is_type_specifier(parser.current_token))
         {
-            translate_type(parse_declaration(&parser), 1);
+            translate_type(parse_declaration(&parser), 0);
         }
         else
         {
@@ -310,12 +364,14 @@ void parse_tokens(struct token_t *tokens)
         }
     }
 
+   // free(parser.decl_stack);
 }
 
 
 struct base_type_t *parse_declaration(struct parser_t *parser)
 {
     struct base_type_t *type = NULL;
+    struct base_type_t *last_type = NULL;
 
     struct base_type_t *specifiers_qualifiers = NULL;
     struct base_type_t *last_specifier_qualifier = NULL;
@@ -324,103 +380,124 @@ struct base_type_t *parse_declaration(struct parser_t *parser)
     struct base_type_t *current_type = NULL;
     struct base_type_t *prev_type = NULL;
     struct base_type_t *declarator = NULL;
-    struct base_type_t *temp = NULL;
+    struct base_type_t *temp_type = NULL;
 
-    int type_type;
+    struct aggretage_type_t *aggretage_type;
 
-    if(is_type_specifier(parser->current_token))
+    struct token_t *next_token;
+
+    struct reference_type_t *type_reference = NULL;
+
+    //if(is_type_specifier(parser->current_token))
+    //{
+    /* this is a declaration, which means
+    we're expecting a bunch of type qualifiers,
+    a few type specifiers, which are compatible
+    with each other, and then a declarator.
+
+    A declarator is defined as:
+    pointer (optional) + direct-declarator
+
+
+
+    A direct-declarator is defined as:
+    identifier, a name;
+    ( declarator ), a whole declarator inside parenthesis;
+    direct-declarator + [type-qualifier-list (optional) assignment-expression(optional)];
+    direct-declarator + [static type-qualifier-list (optional) assignment-expression];
+    direct-declarator + [type-qualifier-list static assignment-expression];
+    direct-declarator + [type-qualifier-list (optional) *];
+    direct-declarator + (parameter-type-list);
+    direct-declarator + (identifier-list (optional));
+
+
+    This means that a declarator can be
+    formed by several other declarators
+    before we get to an actual identifier.
+
+    This means that things like
+
+    void *(*(*(*(*(*identifier)))))
+
+    are valid, given that they can be rewritten as
+    pointer + direct-declarator.
+
+    For instance,
+
+    type-qualifier declarator,
+    type-qualifier pointer direct-declarator,
+    type-qualifier pointer ( declarator ),
+    type-qualifier pointer ( pointer direct-declarator )
+    type-qualifier pointer ( pointer ( declarator ) )
+    type-qualifier pointer ( pointer ( pointer direct-declarator ) )
+    type-qualifier pointer ( pointer ( pointer ( declarator ) ) )
+    type-qualifier pointer ( pointer ( pointer ( pointer direct-declarator ) ) )
+    type-qualifier pointer ( pointer ( pointer ( pointer ( declarator ) ) ) )
+    type-qualifier pointer ( pointer ( pointer ( pointer ( pointer direct-declarator ) ) ) )
+    type-qualifier pointer ( pointer ( pointer ( pointer ( pointer ( declarator ) ) ) ) )
+    type-qualifier pointer ( pointer ( pointer ( pointer ( pointer ( pointer direct-declarator ) ) ) ) )
+    type-qualifier pointer ( pointer ( pointer ( pointer ( pointer ( pointer identifier ) ) ) ) )
+
+
+
+    or void *(*func(int, int))(int, int, int)
+
+    which can be decomposed into
+
+    type-qualifier declarator,
+    type-qualifier pointer direct-declarator,
+    type-qualifier pointer direct-declarator(parameter-type-list),
+    type-qualifier pointer ( declarator )(parameter-type-list),
+    type-qualifier pointer ( pointer direct-declarator )(parameter-type-list),
+    type-qualifier pointer ( pointer direct-declarator(parameter-type-list) )(parameter-type-list)
+
+
+
+
+    The behavior we need to keep in mind is that a declarator can
+    be defined recursively as a declarator.
+    */
+
+    do
     {
-        /* this is a declaration, which means
-        we're expecting a bunch of type qualifiers,
-        a few type specifiers, which are compatible
-        with each other, and then a declarator.
-
-        A declarator is defined as:
-        pointer (optional) + direct-declarator
-
-
-
-        A direct-declarator is defined as:
-        identifier, a name;
-        ( declarator ), a whole declarator inside parenthesis;
-        direct-declarator + [type-qualifier-list (optional) assignment-expression(optional)];
-        direct-declarator + [static type-qualifier-list (optional) assignment-expression];
-        direct-declarator + [type-qualifier-list static assignment-expression];
-        direct-declarator + [type-qualifier-list (optional) *];
-        direct-declarator + (parameter-type-list);
-        direct-declarator + (identifier-list (optional));
-
-
-        This means that a declarator can be
-        formed by several other declarators
-        before we get to an actual identifier.
-
-        This means that things like
-
-        void *(*(*(*(*(*identifier)))))
-
-        are valid, given that they can be rewritten as
-        pointer + direct-declarator.
-
-        For instance,
-
-        type-qualifier declarator,
-        type-qualifier pointer direct-declarator,
-        type-qualifier pointer ( declarator ),
-        type-qualifier pointer ( pointer direct-declarator )
-        type-qualifier pointer ( pointer ( declarator ) )
-        type-qualifier pointer ( pointer ( pointer direct-declarator ) )
-        type-qualifier pointer ( pointer ( pointer ( declarator ) ) )
-        type-qualifier pointer ( pointer ( pointer ( pointer direct-declarator ) ) )
-        type-qualifier pointer ( pointer ( pointer ( pointer ( declarator ) ) ) )
-        type-qualifier pointer ( pointer ( pointer ( pointer ( pointer direct-declarator ) ) ) )
-        type-qualifier pointer ( pointer ( pointer ( pointer ( pointer ( declarator ) ) ) ) )
-        type-qualifier pointer ( pointer ( pointer ( pointer ( pointer ( pointer direct-declarator ) ) ) ) )
-        type-qualifier pointer ( pointer ( pointer ( pointer ( pointer ( pointer identifier ) ) ) ) )
-
-
-
-        or void *(*func(int, int))(int, int, int)
-
-        which can be decomposed into
-
-        type-qualifier declarator,
-        type-qualifier pointer direct-declarator,
-        type-qualifier pointer direct-declarator(parameter-type-list),
-        type-qualifier pointer ( declarator )(parameter-type-list),
-        type-qualifier pointer ( pointer direct-declarator )(parameter-type-list),
-        type-qualifier pointer ( pointer direct-declarator(parameter-type-list) )(parameter-type-list)
-
-
-
-
-        The behavior we need to keep in mind is that a declarator can
-        be defined recursively as a declarator.
-        */
-
-        do
+        if(parser->param_list_level)
         {
-            if(parser->param_list_level)
+            specifiers_qualifiers = NULL;
+        }
+
+        if(is_type_specifier(parser->current_token) || is_type_qualifier(parser->current_token))
+        {
+            while(is_type_specifier(parser->current_token) || is_type_qualifier(parser->current_token))
             {
-                specifiers_qualifiers = NULL;
-            }
-            else
-            {
-                if(is_type_specifier(parser->current_token) && specifiers_qualifiers)
+                if(parser->current_token->token_name == TOKEN_KEYWORD_STRUCT)
                 {
-                    /* error... */
+                    next_token = parser->current_token->next;
+                    new_type = NULL;
+
+                    if(next_token->token_type == TOKEN_IDENTIFIER)
+                    {
+                        new_type = get_aggregate_type(parser, next_token->text);
+                        next_token = next_token->next;
+                    }
+
+                    if(next_token->token_type == TOKEN_PUNCTUATOR &&
+                       next_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
+                    {
+                        if(new_type)
+                        {
+                            /* error: redefinition of aggregate type... */
+                        }
+
+                        /* we're declaring a struct here... */
+                        new_type = parse_aggregate_definition(parser);
+                    }
                 }
-            }
-
-            while(is_type_specifier(parser->current_token))
-            {
-                /* type specifiers: int, short, unsigned, etc... */
-                type_type = type_from_token(parser->current_token);
-
-                new_type = calloc(sizeof(struct base_type_t), 1);
-
-                new_type->next = NULL;
-                new_type->type = type_type;
+                else
+                {
+                    new_type = calloc(sizeof(struct base_type_t), 1);
+                    new_type->type = type_from_token(parser->current_token);
+                    advance_token(parser);
+                }
 
                 if(!specifiers_qualifiers)
                 {
@@ -428,76 +505,78 @@ struct base_type_t *parse_declaration(struct parser_t *parser)
                 }
                 else
                 {
-                    last_specifier_qualifier->next = type;
+                    last_specifier_qualifier->next = new_type;
                 }
 
                 last_specifier_qualifier = new_type;
-
-                advance_token(parser);
             }
+        }
+        else if(parser->current_token->token_type == TOKEN_IDENTIFIER)
+        {
+            if(is_typedef_name(parser->current_token))
+            {
 
-            current_type = specifiers_qualifiers;
+            }
+            else
+            {
+                /* error: unknown type... */
+            }
+        }
 
+        current_type = specifiers_qualifiers;
+
+        if(current_type)
+        {
             /* declarator: identifier, function, array, pointer, etc... */
             declarator = parse_declarator(parser);
 
             if(declarator)
             {
-                temp = declarator;
+                temp_type = declarator;
 
-                while(temp->next)
+                while(temp_type->next)
                 {
-                    temp = temp->next;
+                    temp_type = temp_type->next;
                 }
 
-                temp->next = specifiers_qualifiers;
+                temp_type->next = specifiers_qualifiers;
 
                 current_type = declarator;
             }
 
-            temp = current_type;
+            type_reference = calloc(sizeof(struct reference_type_t), 1);
+            type_reference->base.next = NULL;
+            type_reference->base.type = TYPE_REFERENCE;
 
-            while(temp->next)
-            {
-                temp = temp->next;
-            }
-
-            /* unknown type will be used to mark the end
-            of a type... */
-            new_type = calloc(sizeof(struct base_type_t), 1);
-            new_type->next = NULL;
-            new_type->type = TYPE_UNKNOWN;
-
-            temp->next = new_type;
+            type_reference->type = current_type;
 
             if(!type)
             {
-                type = current_type;
+                type = (struct base_type_t *)type_reference;
             }
             else
             {
-                temp = prev_type;
-
-                while(temp->next)
-                {
-                    temp = temp->next;
-                }
-
-                temp->next = current_type;
+                last_type->next = (struct base_type_t *)type_reference;
             }
 
-            prev_type = current_type;
+            last_type = (struct base_type_t *)type_reference;
+        }
 
-            if(parser->current_token->token_type != TOKEN_PUNCTUATOR ||
-               parser->current_token->token_name != TOKEN_PUNCTUATOR_COMMA)
-            {
-                break;
-            }
+        if(parser->current_token->token_type != TOKEN_PUNCTUATOR ||
+           parser->current_token->token_name != TOKEN_PUNCTUATOR_COMMA)
+        {
+            break;
+        }
 
-            advance_token(parser);
+        if(!current_type)
+        {
+            /* error: expecting expression before token ',' */
+        }
 
-        }while(1);
-    }
+        advance_token(parser);
+
+    }while(1);
+    //}
 
     return type;
 }
@@ -514,6 +593,7 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
     struct array_type_t *array_type = NULL;
     struct base_type_t *pointer_type = NULL;
     struct identifier_type_t *identifier = NULL;
+    struct reference_type_t *params_or_fields = NULL;
 
 
     if(is_type_specifier(parser->current_token))
@@ -610,24 +690,27 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
                 possibly declaring other identifiers, so we call the declaration
                 parsing routine here...*/
 
+                params_or_fields = NULL;
 
-                parser->param_list_level++;
+                if(parser->current_token->token_type != TOKEN_PUNCTUATOR ||
+                   parser->current_token->token_name != TOKEN_PUNCTUATOR_CPARENTHESIS)
+                {
+                    parser->param_list_level++;
+                    params_or_fields = parse_declaration(parser);
+                    parser->param_list_level--;
+                }
 
-                new_type = parse_declaration(parser);
-
-                parser->param_list_level--;
-
-                if(!new_type)
+                if(!params_or_fields)
                 {
                     /* empty params, implies void
                     param... */
-                    new_type = calloc(sizeof(struct base_type_t), 1);
-                    new_type->next = NULL;
-                    new_type->type = TYPE_VOID;
+                    params_or_fields = calloc(sizeof(struct reference_type_t), 1);
+                    params_or_fields->type = calloc(sizeof(struct base_type_t), 1);
+                    params_or_fields->type->type = TYPE_VOID;
                 }
 
 
-                function_type->params = new_type;
+                function_type->params = params_or_fields;
 
                 /* ) */
                 advance_token(parser);
@@ -714,6 +797,102 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
 
     return type;
 }
+
+
+struct base_type_t *parse_aggregate_definition(struct parser_t *parser)
+{
+    struct aggretage_type_t *type;
+
+    struct reference_type_t *field = NULL;
+    struct reference_type_t *fields = NULL;
+    struct reference_type_t *last_field = NULL;
+
+    type = calloc(sizeof(struct aggretage_type_t), 1);
+
+    if(parser->current_token->token_type == TOKEN_KEYWORD)
+    {
+        switch(parser->current_token->token_name)
+        {
+            case TOKEN_KEYWORD_STRUCT:
+                type->base.type = TYPE_STRUCT;
+            break;
+
+            case TOKEN_KEYWORD_UNION:
+                type->base.type = TYPE_UNION;
+            break;
+        }
+    }
+    else
+    {
+        /* everything else is wrong... */
+    }
+
+    advance_token(parser);
+
+    if(parser->current_token->token_type == TOKEN_IDENTIFIER)
+    {
+        type->name = strdup(parser->current_token->text);
+        advance_token(parser);
+    }
+
+
+    if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
+       parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
+    {
+        advance_token(parser);
+
+        while(1)
+        {
+            field = parse_declaration(parser);
+
+            if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
+               parser->current_token->token_name == TOKEN_PUNCTUATOR_SEMICOLON)
+            {
+                advance_token(parser);
+            }
+
+            if(!fields)
+            {
+                fields = field;
+            }
+            else
+            {
+                last_field->base.next = field;
+            }
+
+            last_field = field;
+
+            if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
+               parser->current_token->token_name == TOKEN_PUNCTUATOR_CBRACE)
+            {
+                advance_token(parser);
+                break;
+            }
+
+            //advance_token(parser);
+        }
+
+        type->fields = fields;
+    }
+
+    if(type->name)
+    {
+        /* this aggregate type has a tag, so we stash it... */
+        stash_aggregate_type(parser, type);
+    }
+
+    return (struct base_type_t *)type;
+}
+
+
+
+
+
+
+
+
+
+
 
 
 
