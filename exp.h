@@ -3,7 +3,7 @@
 
 
 #include "tok.h"
-#include "var.h"
+#include "parse.h"
 
 enum EXP_RESULT_TYPE
 {
@@ -22,8 +22,8 @@ union exp_result_value_t
 struct exp_result_t
 {
     int result_type;
-    union exp_result_value_t result_value;
-    char text[128];
+//    union exp_result_value_t result_value;
+//    char text[128];
 };
 
 struct ast_node_t
@@ -59,39 +59,39 @@ void expression7(struct exp_result_t *result, struct token_t **tokens);
 
 
 
-struct ast_node_t *exp_16(struct token_t **tokens);
+struct ast_node_t *exp_16(struct parser_t *parser);
 
-struct ast_node_t *exp_15(struct token_t **tokens);
+struct ast_node_t *exp_15(struct parser_t *parser);
 
-struct ast_node_t *exp_14(struct token_t **tokens);
+struct ast_node_t *exp_14(struct parser_t *parser);
 
-struct ast_node_t *exp_13(struct token_t **tokens);
+struct ast_node_t *exp_13(struct parser_t *parser);
 
-struct ast_node_t *exp_12(struct token_t **tokens);
+struct ast_node_t *exp_12(struct parser_t *parser);
 
-struct ast_node_t *exp_11(struct token_t **tokens);
+struct ast_node_t *exp_11(struct parser_t *parser);
 
-struct ast_node_t *exp_10(struct token_t **tokens);
+struct ast_node_t *exp_10(struct parser_t *parser);
 
-struct ast_node_t *exp_9(struct token_t **tokens);
+struct ast_node_t *exp_9(struct parser_t *parser);
 
-struct ast_node_t *exp_8(struct token_t **tokens);
+struct ast_node_t *exp_8(struct parser_t *parser);
 
-struct ast_node_t *exp_7(struct token_t **tokens);
+struct ast_node_t *exp_7(struct parser_t *parser);
 
-struct ast_node_t *exp_6(struct token_t **tokens);
+struct ast_node_t *exp_6(struct parser_t *parser);
 
-struct ast_node_t *exp_5(struct token_t **tokens);
+struct ast_node_t *exp_5(struct parser_t *parser);
 
-struct ast_node_t *exp_4(struct token_t **tokens);
+struct ast_node_t *exp_4(struct parser_t *parser);
 
-struct ast_node_t *exp_3(struct token_t **tokens);
+struct ast_node_t *exp_3(struct parser_t *parser);
 
-struct ast_node_t *exp_2(struct token_t **tokens);
+struct ast_node_t *exp_2(struct parser_t *parser);
 
-struct ast_node_t *exp_1(struct token_t **tokens);
+struct ast_node_t *exp_1(struct parser_t *parser);
 
-struct ast_node_t *exp_0(struct token_t **tokens);
+struct ast_node_t *exp_0(struct parser_t *parser);
 
 
 void traverse_ast(struct ast_node_t *ast);

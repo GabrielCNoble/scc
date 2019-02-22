@@ -50,5 +50,5 @@ int main()
         //parse_statements(exp);
     }
 
-    clear_vars();
+//    clear_vars();
 }

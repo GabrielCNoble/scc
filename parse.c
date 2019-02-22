@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 
 
@@ -182,122 +183,91 @@ void advance_token(struct parser_t *parser)
     parser->current_token = parser->current_token->next;
 }
 
-
-void translate_type(struct reference_type_t *type, int single_reference)
+struct scope_t *push_scope(struct parser_t *parser)
 {
-    struct identifier_type_t *identifier;
-    struct function_type_t *function;
-    struct reference_type_t *param_or_field;
-    struct base_type_t *base_type;
-    struct aggretage_type_t *aggretage_type;
+    struct scope_t *scope;
 
-    while(type)
+    scope = calloc(sizeof(struct scope_t ), 1);
+
+    scope->parent = parser->current_scope;
+    parser->current_scope = scope;
+
+    parser->scope_stack_top++;
+    parser->scope_stack[parser->scope_stack_top] = scope;
+
+
+    return scope;
+}
+
+struct scope_t *pop_scope(struct parser_t *parser, int delete_scope)
+{
+    struct scope_t *scope = NULL;
+
+    if(parser->scope_stack_top > 0)
     {
-        base_type = type->type;
+        scope = parser->current_scope;
 
-        while(base_type)
+        if(delete_scope)
         {
-            switch(base_type->type)
-            {
-                case TYPE_IDENTIFIER:
-                    identifier = (struct identifier_type_t *)base_type;
-                    printf("[%s] is ", identifier->identifier);
-                break;
-
-                case TYPE_POINTER:
-                    printf("a pointer to ");
-                break;
-
-                case TYPE_FUNCTION:
-                    function = (struct function_type_t *)base_type;
-
-                    printf("a function (");
-
-                    param_or_field = function->params;
-
-                    while(param_or_field)
-                    {
-                        translate_type(param_or_field, 1);
-
-                        param_or_field = (struct reference_type_t *)param_or_field->base.next;
-
-                        if(param_or_field)
-                        {
-                            printf(", ");
-                        }
-                    }
-
-                    printf("), returning ");
-                break;
-
-                case TYPE_STRUCT:
-                    aggretage_type = (struct aggretage_type_t *)base_type;
-
-                    if(aggretage_type->name)
-                    {
-                        printf("a struct [%s] {", aggretage_type->name);
-                    }
-                    else
-                    {
-                        printf("an anonymous struct {");
-                    }
-
-                    param_or_field = aggretage_type->fields;
-
-                    while(param_or_field)
-                    {
-                        translate_type(param_or_field, 1);
-
-                        param_or_field = param_or_field->base.next;
-
-                        if(param_or_field)
-                        {
-                            printf(", ");
-                        }
-                    }
-
-                    printf("}, ");
-
-
-                break;
-
-                case TYPE_INT:
-                    printf("an int");
-                break;
-
-                case TYPE_FLOAT:
-                    printf("a float");
-                break;
-
-                case TYPE_DOUBLE:
-                    printf("a double");
-                break;
-
-                case TYPE_VOID:
-                    printf("void");
-                break;
-
-                case TYPE_SHORT:
-                    printf("a short");
-                break;
-
-                case TYPE_CHAR:
-                    printf("a char");
-                break;
-
-                default:
-                    return;
-                break;
-            }
-
-            base_type = base_type->next;
+            free(scope);
         }
 
-        type = single_reference ? NULL : (struct reference_type_t *)type->base.next;
+        parser->scope_stack_top--;
+
+        parser->current_scope = parser->scope_stack[parser->scope_stack_top];
     }
 
-    //printf("\n");
+    return parser->current_scope;
 }
+
+struct object_t *create_object(struct parser_t *parser, struct base_type_t *type)
+{
+    struct object_t *object;
+    struct identifier_type_t *object_type;
+
+    if(type->type == TYPE_REFERENCE)
+    {
+        type = ((struct reference_type_t *)type)->type;
+    }
+
+    assert(type->type == TYPE_IDENTIFIER);
+
+    object_type = (struct identifier_type_t *)type;
+
+    object = calloc(sizeof(struct object_t), 1);
+
+    object->next = parser->objects;
+    parser->objects = object;
+
+    object->type = object_type->base.next;
+    object->scope = parser->current_scope;
+    object->id = strdup(object_type->identifier);
+
+    return object;
+}
+
+int is_object_in_scope(struct parser_t *parser, struct object_t *object)
+{
+    struct scope_t *scope;
+
+    scope = parser->current_scope;
+
+    while(scope)
+    {
+        /* test whether we can get to the object's scope
+        from the current scope or not. If yes, it's in scope... */
+        if(scope == object->scope)
+        {
+            break;
+        }
+
+        scope = scope->parent;
+    }
+
+    /* null here means the object is out of scope... */
+    return (int)scope;
+}
+
 
 void stash_aggregate_type(struct parser_t *parser, struct aggretage_type_t *type)
 {
@@ -320,16 +290,21 @@ struct base_type_t *stash_typedef_type(struct parser_t *parser, struct base_type
 
 struct base_type_t *get_aggregate_type(struct parser_t *parser, char *name)
 {
-//    struct aggretage_type_t *types;
-//
-//    types = parser->aggregate_types;
-//
-//    while(types)
-//    {
-//
-//    }
+    struct aggretage_type_t *type;
 
-    return NULL;
+    type = parser->aggregate_types;
+
+    while(type)
+    {
+        if(!strcmp(name, type->name))
+        {
+            break;
+        }
+
+        type = (struct aggretage_type_t *)type->base.next;
+    }
+
+    return (struct base_type_t *)type;
 }
 
 /*void push_type(struct parser_t *parser, struct base_type_t *type)
@@ -338,7 +313,7 @@ struct base_type_t *get_aggregate_type(struct parser_t *parser, char *name)
     parser->decl_stack_depth++;
 }*/
 
-#define DECL_MAX_DEPTH 8192
+#define SCOPE_MAX_DEPTH 8192
 
 void parse_tokens(struct token_t *tokens)
 {
@@ -350,21 +325,23 @@ void parse_tokens(struct token_t *tokens)
     parser.tokens = tokens;
     parser.current_token = tokens;
 
-   // parser.decl_stack = calloc(sizeof(struct base_type_t *), DECL_MAX_DEPTH);
+    parser.scope_stack_top = -1;
+    parser.scope_stack = calloc(sizeof(struct scope_t *), SCOPE_MAX_DEPTH);
+
+    /* global (file) scope... */
+    push_scope(&parser);
 
     while(parser.current_token->token_type != TOKEN_EOF)
     {
         if(is_type_specifier(parser.current_token))
         {
-            translate_type(parse_declaration(&parser), 0);
+            translate_type((struct reference_type_t *)parse_declaration(&parser), 0);
         }
         else
         {
             advance_token(&parser);
         }
     }
-
-   // free(parser.decl_stack);
 }
 
 
@@ -718,7 +695,8 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
             break;
 
             case TOKEN_PUNCTUATOR_OBRACKET:
-
+                array_type = calloc(sizeof(struct array_type_t), 1);
+                advance_token(parser);
             break;
 
             default:
@@ -887,6 +865,124 @@ struct base_type_t *parse_aggregate_definition(struct parser_t *parser)
 
 
 
+
+
+
+void translate_type(struct reference_type_t *type, int single_reference)
+{
+    struct identifier_type_t *identifier;
+    struct function_type_t *function;
+    struct reference_type_t *param_or_field;
+    struct base_type_t *base_type;
+    struct aggretage_type_t *aggretage_type;
+
+    while(type)
+    {
+        base_type = type->type;
+
+        while(base_type)
+        {
+            switch(base_type->type)
+            {
+                case TYPE_IDENTIFIER:
+                    identifier = (struct identifier_type_t *)base_type;
+                    printf("[%s] is ", identifier->identifier);
+                break;
+
+                case TYPE_POINTER:
+                    printf("a pointer to ");
+                break;
+
+                case TYPE_FUNCTION:
+                    function = (struct function_type_t *)base_type;
+
+                    printf("a function (");
+
+                    param_or_field = function->params;
+
+                    while(param_or_field)
+                    {
+                        translate_type(param_or_field, 1);
+
+                        param_or_field = (struct reference_type_t *)param_or_field->base.next;
+
+                        if(param_or_field)
+                        {
+                            printf(", ");
+                        }
+                    }
+
+                    printf("), returning ");
+                break;
+
+                case TYPE_STRUCT:
+                    aggretage_type = (struct aggretage_type_t *)base_type;
+
+                    if(aggretage_type->name)
+                    {
+                        printf("a struct [%s] {", aggretage_type->name);
+                    }
+                    else
+                    {
+                        printf("an anonymous struct {");
+                    }
+
+                    param_or_field = aggretage_type->fields;
+
+                    while(param_or_field)
+                    {
+                        translate_type(param_or_field, 1);
+
+                        param_or_field = param_or_field->base.next;
+
+                        if(param_or_field)
+                        {
+                            printf(", ");
+                        }
+                    }
+
+                    printf("}, ");
+
+
+                break;
+
+                case TYPE_INT:
+                    printf("an int");
+                break;
+
+                case TYPE_FLOAT:
+                    printf("a float");
+                break;
+
+                case TYPE_DOUBLE:
+                    printf("a double");
+                break;
+
+                case TYPE_VOID:
+                    printf("void");
+                break;
+
+                case TYPE_SHORT:
+                    printf("a short");
+                break;
+
+                case TYPE_CHAR:
+                    printf("a char");
+                break;
+
+                default:
+                    return;
+                break;
+            }
+
+            base_type = base_type->next;
+        }
+
+        type = single_reference ? NULL : (struct reference_type_t *)type->base.next;
+    }
+
+    //printf("\n");
+}
 
 
 

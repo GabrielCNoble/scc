@@ -570,128 +570,129 @@ static struct token_t *next_token = NULL;
 //}
 
 /* return... */
-struct ast_node_t *exp_16(struct token_t **tokens)
+struct ast_node_t *exp_16(struct parser_t *parser)
 {
-    struct token_t *token;
-    struct ast_node_t *node;
-    struct ast_node_t *child;
+//    struct token_t *token;
+//    struct ast_node_t *node;
+//    struct ast_node_t *child;
+//
+//    token = *tokens;
+//
+//    if(token)
+//    {
+//        if(token->token_type == TOKEN_KEYWORD)
+//        {
+//            switch(token->token_name)
+//            {
+//                case TOKEN_KEYWORD_RETURN:
+//                case TOKEN_KEYWORD_INT:
+//                case TOKEN_KEYWORD_FLOAT:
+//                case TOKEN_KEYWORD_CHAR:
+//                case TOKEN_KEYWORD_SHORT:
+//                case TOKEN_KEYWORD_VOID:
+//                    node = calloc(sizeof(struct ast_node_t), 1);
+//                    node->token = token;
+//
+//                    *tokens = token->next;
+//                    node->left = exp_16(tokens);
+//                break;
+//
+//                default:
+//                    node = exp_15(tokens);
+//                break;
+//            }
+//        }
+//        else
+//        {
+//            node = exp_15(tokens);
+//        }
+//
+//    }
+//    else
+//    {
+//        node = exp_15(tokens);
+//    }
 
-    token = *tokens;
-
-    if(token)
-    {
-        if(token->token_type == TOKEN_KEYWORD)
-        {
-            switch(token->token_name)
-            {
-                case TOKEN_KEYWORD_RETURN:
-                case TOKEN_KEYWORD_INT:
-                case TOKEN_KEYWORD_FLOAT:
-                case TOKEN_KEYWORD_CHAR:
-                case TOKEN_KEYWORD_SHORT:
-                case TOKEN_KEYWORD_VOID:
-                    node = calloc(sizeof(struct ast_node_t), 1);
-                    node->token = token;
-
-                    *tokens = token->next;
-                    node->left = exp_16(tokens);
-                break;
-
-                default:
-                    node = exp_15(tokens);
-                break;
-            }
-        }
-        else
-        {
-            node = exp_15(tokens);
-        }
-
-    }
-    else
-    {
-        node = exp_15(tokens);
-    }
-
-    return node;
+    return exp_15(parser);
 }
 
 
 /* ','... */
-struct ast_node_t *exp_15(struct token_t **tokens)
+struct ast_node_t *exp_15(struct parser_t *parser)
 {
-    return exp_14(tokens);
+    return exp_14(parser);
 }
 
 /* assignment '=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '&=', '|=', '^='... */
-struct ast_node_t *exp_14(struct token_t **tokens)
+struct ast_node_t *exp_14(struct parser_t *parser)
 {
-    return exp_13(tokens);
+    return exp_13(parser);
 }
 
 /* ternary '?:' */
-struct ast_node_t *exp_13(struct token_t **tokens)
+struct ast_node_t *exp_13(struct parser_t *parser)
 {
-    return exp_12(tokens);
+    return exp_12(parser);
 }
 
 /* logical '||'... */
-struct ast_node_t *exp_12(struct token_t **tokens)
+struct ast_node_t *exp_12(struct parser_t *parser)
 {
-    return exp_11(tokens);
+    return exp_11(parser);
 }
 
 /* logical '&&'... */
-struct ast_node_t *exp_11(struct token_t **tokens)
+struct ast_node_t *exp_11(struct parser_t *parser)
 {
-    return exp_10(tokens);
+    return exp_10(parser);
 }
 
 /* bitwise '|'... */
-struct ast_node_t *exp_10(struct token_t **tokens)
+struct ast_node_t *exp_10(struct parser_t *parser)
 {
-    return exp_9(tokens);
+    return exp_9(parser);
 }
 
 /* bitwise '^'... */
-struct ast_node_t *exp_9(struct token_t **tokens)
+struct ast_node_t *exp_9(struct parser_t *parser)
 {
-    return exp_8(tokens);
+    return exp_8(parser);
 }
 
 /* bitwise '&' ... */
-struct ast_node_t *exp_8(struct token_t **tokens)
+struct ast_node_t *exp_8(struct parser_t *parser)
 {
-    return exp_7(tokens);
+    return exp_7(parser);
 }
 
 /* relational '==', '!=' ... */
-struct ast_node_t *exp_7(struct token_t **tokens)
+struct ast_node_t *exp_7(struct parser_t *parser)
 {
-    return exp_6(tokens);
+    return exp_6(parser);
 }
 
 /* relational '<', '<=', '>', '>=' ... */
-struct ast_node_t *exp_6(struct token_t **tokens)
+struct ast_node_t *exp_6(struct parser_t *parser)
 {
-    return exp_5(tokens);
+    return exp_5(parser);
 }
 
 /* bitwise '<<', '>>' ... */
-struct ast_node_t *exp_5(struct token_t **tokens)
+struct ast_node_t *exp_5(struct parser_t *parser)
 {
-    return exp_4(tokens);
+    return exp_4(parser);
 }
 
 /* arithmetic '+'. '-'... */
-struct ast_node_t *exp_4(struct token_t **tokens)
+struct ast_node_t *exp_4(struct parser_t *parser)
 {
     struct token_t *token;
     struct ast_node_t *node = NULL;
     struct ast_node_t *child = NULL;
 
-    child = exp_3(tokens);
-    token = *tokens;
+    child = exp_3(parser);
+    token = parser->current_token;
+    //token = *tokens;
 
     node = child;
 
@@ -708,9 +709,9 @@ struct ast_node_t *exp_4(struct token_t **tokens)
                     node->left = child;
                     node->token = token;
 
-                    *tokens = token->next;
+                    advance_token(parser);
 
-                    node->right = exp_4(tokens);
+                    node->right = exp_4(parser);
                 break;
             }
         }
@@ -720,14 +721,14 @@ struct ast_node_t *exp_4(struct token_t **tokens)
 }
 
 /* arithmetic '*', '/', '%' ... */
-struct ast_node_t *exp_3(struct token_t **tokens)
+struct ast_node_t *exp_3(struct parser_t *parser)
 {
     struct token_t *token;
     struct ast_node_t *node = NULL;
     struct ast_node_t *child = NULL;
 
-    child = exp_2(tokens);
-    token = *tokens;
+    child = exp_2(parser);
+    token = parser->current_token;
 
     node = child;
 
@@ -739,12 +740,12 @@ struct ast_node_t *exp_3(struct token_t **tokens)
             {
                 case TOKEN_PUNCTUATOR_ASTERISC:
                 case TOKEN_PUNCTUATOR_SLASH:
-                    *tokens = token->next;
+                    advance_token(parser);
                     node = calloc(sizeof(struct ast_node_t), 1);
                     node->token = token;
                     node->left = child;
 
-                    child = exp_3(tokens);
+                    child = exp_3(parser);
                     node->right = child;
                 break;
             }
@@ -755,13 +756,13 @@ struct ast_node_t *exp_3(struct token_t **tokens)
 }
 
 /* unary '*', '&', '+', '-' ... */
-struct ast_node_t *exp_2(struct token_t **tokens)
+struct ast_node_t *exp_2(struct parser_t *parser)
 {
     struct token_t *token;
     struct ast_node_t *node = NULL;
     struct ast_node_t *child = NULL;
 
-    token = *tokens;
+    token = parser->current_token;
 
     if(token)
     {
@@ -774,12 +775,12 @@ struct ast_node_t *exp_2(struct token_t **tokens)
                         node = calloc(sizeof(struct ast_node_t), 1);
                         node->token = token;
 
-                        *tokens = token->next;
-                        node->left = exp_2(tokens);
+                        advance_token(parser);
+                        node->left = exp_2(parser);
                     break;
 
                     default:
-                        node = exp_2(tokens);
+                        node = exp_2(parser);
                     break;
                 }
             break;
@@ -794,31 +795,31 @@ struct ast_node_t *exp_2(struct token_t **tokens)
                         node = calloc(sizeof(struct ast_node_t), 1);
                         node->token = token;
 
-                        *tokens = token->next;
-                        node->left = exp_2(tokens);
+                        advance_token(parser);
+                        node->left = exp_2(parser);
                     break;
 
                     default:
-                        node = exp_1(tokens);
+                        node = exp_1(parser);
                     break;
                 }
             break;
 
             default:
-                node = exp_1(tokens);
+                node = exp_1(parser);
             break;
         }
     }
     else
     {
-        node = exp_1(tokens);
+        node = exp_1(parser);
     }
 
     return node;
 }
 
 /* '()', '[]', '{}', postfix '++', '--', '.', '->', ... */
-struct ast_node_t *exp_1(struct token_t **tokens)
+struct ast_node_t *exp_1(struct parser_t *parser)
 {
     struct token_t *token;
     struct ast_node_t *node = NULL;
@@ -826,7 +827,7 @@ struct ast_node_t *exp_1(struct token_t **tokens)
 
     //child = exp_0(tokens);
 
-    token = *tokens;
+    token = parser->current_token;
 
     //node = child;
 
@@ -844,10 +845,10 @@ struct ast_node_t *exp_1(struct token_t **tokens)
                     node->token = token;
                     //node->left = child;
 
-                    *tokens = token->next;
-                    node->left = exp_16(tokens);
-                    token = *tokens;
-                    *tokens = token->next;
+                    advance_token(parser);
+                    node->left = exp_16(parser);
+                    token = parser->current_token;
+                    advance_token(parser);
 
 //                    if(token->token_name != node->token_ + 1)
 //                    {
@@ -865,7 +866,7 @@ struct ast_node_t *exp_1(struct token_t **tokens)
                     node->token = token;
                     node->left = child;
 
-                    *tokens = token->next;
+                    advance_token(parser);
                 break;
             }
         }
@@ -877,8 +878,8 @@ struct ast_node_t *exp_1(struct token_t **tokens)
                 case TOKEN_IDENTIFIER:
                     node = calloc(sizeof(struct ast_node_t), 1);
                     node->token = token;
-                    *tokens = token->next;
-                    node->left = exp_1(tokens);
+                    advance_token(parser);
+                    node->left = exp_1(parser);
                 break;
             }
         }
@@ -888,12 +889,12 @@ struct ast_node_t *exp_1(struct token_t **tokens)
 }
 
 /* literals, identifiers ... */
-struct ast_node_t *exp_0(struct token_t **tokens)
+struct ast_node_t *exp_0(struct parser_t *parser)
 {
     struct token_t *token;
     struct ast_node_t *node = NULL;
 
-    token = *tokens;
+    token = parser->current_token;
 
     if(token)
     {
@@ -903,7 +904,7 @@ struct ast_node_t *exp_0(struct token_t **tokens)
             case TOKEN_CONSTANT:
                 node = calloc(sizeof(struct ast_node_t ), 1);
                 node->token = token;
-                *tokens = token->next;
+                advance_token(parser);
             break;
         }
     }
