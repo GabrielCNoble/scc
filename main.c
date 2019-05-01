@@ -12,17 +12,6 @@ int main()
     char exp[1024];
     int exp_len;
     struct token_t *tokens;
-    struct token_t *token;
-    struct ast_node_t *ast;
-
-//    char c[] = "abc";
-//    char r = ((struct {char a; char b; char c;} *)c)->c;
-//
-//    printf("%c\n", r);
-
-    //struct statement_t *statements;
-    //sizeof(int *(*(int *(void)))(void *, void *));
-    //int *(int (*)(long ), int )(int , ...);
 
     while(1)
     {
@@ -49,6 +38,4 @@ int main()
 
         //parse_statements(exp);
     }
-
-//    clear_vars();
 }

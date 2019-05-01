@@ -40,6 +40,15 @@ enum TOKEN
 };
 
 
+enum TOKEN_CONSTANT
+{
+    TOKEN_CONSTANT_INTEGER,
+    TOKEN_CONSTANT_FLOAT,
+    TOKEN_CONSTANT_CHAR,
+    TOKEN_CONSTANT_HEX,
+};
+
+
 enum TOKEN_PUNCTUATOR
 {
     TOKEN_PUNCTUATOR_PLUS = 0,
@@ -136,6 +145,9 @@ struct token_t
     char text[64];
     int token_type;
     int token_name;
+
+    unsigned int line;
+    unsigned int column;
 //    int token;
 //    int reserved_token;
 };

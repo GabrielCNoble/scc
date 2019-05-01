@@ -3,8 +3,11 @@
 
 
 
+#include "scope.h"
 
 
+/* not everything here is a type specifier, but this makes the parser
+implementation simpler, and also allow for easy type comparison... */
 enum TYPE
 {
     TYPE_INT = 0,
@@ -14,6 +17,10 @@ enum TYPE
     TYPE_DOUBLE,
     TYPE_LONG,
     TYPE_UNSIGNED,
+    TYPE_CONST,
+    TYPE_VOLATILE,
+    TYPE_RESTRICT,
+    TYPE_EXTERN,
     TYPE_SIGNED,
     TYPE_VOID,
     TYPE_STRUCT,
@@ -31,9 +38,6 @@ struct base_type_t
 {
     struct base_type_t *next;
     unsigned short type;
-    unsigned char is_const;
-    unsigned char is_restrict;
-    unsigned char is_volatile;
 };
 
 struct array_type_t
@@ -53,7 +57,9 @@ struct aggretage_type_t
 struct function_type_t
 {
     struct base_type_t base;
-    struct reference_type_t *params;
+    struct reference_type_t *args;
+    int arg_count;
+    int old_style;
 };
 
 /* not really a type, but is here
