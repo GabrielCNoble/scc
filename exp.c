@@ -824,12 +824,12 @@ struct exp_result_t exp_1(struct parser_t *parser)
             break;
 
             case TOKEN_PUNCTUATOR_INCREMENT:
-                printf("reg%d++\n", result.immediate);
+                //printf("reg%d++\n", result.immediate);
                 advance_token(parser);
             break;
 
             case TOKEN_PUNCTUATOR_DECREMENT:
-                printf("reg%d--\n", result.immediate);
+                //printf("reg%d--\n", result.immediate);
                 advance_token(parser);
             break;
 
@@ -860,17 +860,21 @@ struct exp_result_t exp_0(struct parser_t *parser)
         switch(token->token_type)
         {
             case TOKEN_IDENTIFIER:
-                printf("reg%d = mem\n", parser->reg_index);
-                result.immediate = parser->reg_index;
-                parser->reg_index++;
+                //printf("reg%d = mem\n", parser->reg_index);
+                //result.immediate = parser->reg_index;
+                //parser->reg_index++;
                 advance_token(parser);
             break;
 
             case TOKEN_CONSTANT:
-                printf("reg%d = constant\n", parser->reg_index);
-                result.immediate = parser->reg_index;
-                parser->reg_index++;
+                //printf("reg%d = constant\n", parser->reg_index);
+                //result.immediate = parser->reg_index;
+                //parser->reg_index++;
                 advance_token(parser);
+            break;
+
+            default:
+                /* if it falls here, something is wrong... */
             break;
         }
     }

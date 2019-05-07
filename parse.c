@@ -659,8 +659,8 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
                         /* error: redefinition of aggregate type... */
                     }
 
-                    /* we're declaring a struct here... */
-                    new_type = parse_aggregate_definition(parser);
+                    /* we're declaring a struct/union here... */
+                    new_type = parse_aggregate_declaration(parser);
                 }
             }
             else
@@ -1251,7 +1251,7 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
 }
 
 
-struct base_type_t *parse_aggregate_definition(struct parser_t *parser)
+struct base_type_t *parse_aggregate_declaration(struct parser_t *parser)
 {
     struct aggretage_type_t *type;
 
@@ -1336,6 +1336,95 @@ struct base_type_t *parse_aggregate_definition(struct parser_t *parser)
 }
 
 
+
+
+void parse_statement(struct parser_t *parser)
+{
+    struct token_t *token;
+
+    switch(parser->current_token->token_type)
+    {
+        case TOKEN_KEYWORD:
+            switch(parser->current_token->token_name)
+            {
+                case TOKEN_KEYWORD_IF:
+                    /* if statement... */
+
+                    /* 'if' */
+                    advance_token(parser);
+
+                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
+                       parser->current_token->token_name == TOKEN_PUNCTUATOR_OPARENTHESIS)
+                    {
+
+                        /* parse expression here... */
+
+                        if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
+                           parser->current_token->token_name == TOKEN_PUNCTUATOR_CPARENTHESIS)
+                        {
+                            /* ')' */
+                            advance_token(parser);
+                        }
+                        else
+                        {
+                            /* error: expecting token ')'... */
+                        }
+                    }
+                    else
+                    {
+                        /* error: expecting token '('... */
+                    }
+                break;
+
+                case TOKEN_KEYWORD_SWITCH:
+                    /* switch statement... */
+
+                    /* 'switch' */
+                    advance_token(parser);
+
+                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
+                       parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
+                    {
+
+                        /* parse compound statement here. The compound statement parsing
+                        routine will already skip '{' and '}'... */
+                    }
+                    else
+                    {
+                        /* error: expecting token '{'... */
+                    }
+
+                break;
+
+                case TOKEN_KEYWORD_FOR:
+                case TOKEN_KEYWORD_WHILE:
+                case TOKEN_KEYWORD_DO:
+
+                    /* for/while/do... */
+                    advance_token(parser);
+
+                break;
+
+
+                default:
+                    /* everything else is wrong... */
+                break;
+            }
+        break;
+
+        case TOKEN_PUNCTUATOR:
+            if(parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
+            {
+               /* compound statement... */
+            }
+            else
+            {
+                /* error: */
+            }
+        break;
+    }
+}
+
 void parse_compound_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
 {
     push_scope(parser);
@@ -1346,16 +1435,32 @@ void parse_compound_statement(struct parser_t *parser, struct bytecode_buffer_t 
     while(parser->current_token->token_type != TOKEN_PUNCTUATOR ||
           parser->current_token->token_name != TOKEN_PUNCTUATOR_CBRACE)
     {
-
-
-
         advance_token(parser);
     }
-
 
     pop_scope(parser);
 }
 
+
+void parse_selection_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+{
+
+}
+
+void parse_expression_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+{
+
+}
+
+void parse_iteration_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+{
+
+}
+
+void parse_jump_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+{
+
+}
 
 
 

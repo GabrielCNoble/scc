@@ -120,9 +120,23 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
 
 struct base_type_t *parse_declarator(struct parser_t *parser);
 
-struct base_type_t *parse_aggregate_definition(struct parser_t *parser);
+struct base_type_t *parse_initializer(struct parser_t *parser);
+
+struct base_type_t *parse_aggregate_declaration(struct parser_t *parser);
+
+
+
+void parse_statement(struct parser_t *parser);
 
 void parse_compound_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer);
+
+void parse_selection_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer);
+
+void parse_expression_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer);
+
+void parse_iteration_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer);
+
+void parse_jump_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer);
 
 
 
