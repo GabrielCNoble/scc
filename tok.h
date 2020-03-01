@@ -19,6 +19,8 @@
 //    CHAR_UNKNOWN,
 //};
 
+#include <stdint.h>
+
 enum CHAR_TYPE
 {
     CHAR_PUNCTUATOR = 1,
@@ -138,11 +140,17 @@ enum TOKEN_KEYWORD
     TOKEN_KEYWORD_UNKNOWN,
 };
 
+union constant_t
+{
+    char *string_constant;
+    uint64_t int_constant;
+    double float_constant;
+};
 
 struct token_t
 {
     struct token_t *next;
-    char text[64];
+    union constant_t constant;
     int token_type;
     int token_name;
 
@@ -152,10 +160,9 @@ struct token_t
 //    int reserved_token;
 };
 
+struct token_t lex_token(char *text, uint32_t *offset);
 
-void token_init();
-
-struct token_t *tokenize(char *text);
+struct token_t *lex_tokens(char *text);
 
 void free_tokens(struct token_t *tokens);
 

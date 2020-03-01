@@ -1,814 +1,306 @@
 #include "exp.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-
-static struct token_t *next_token = NULL;
-
-//
-//struct token_t *get_token()
-//{
-//    return next_token;
-//}
-//
-//void advance_token()
-//{
-//    if(next_token)
-//    {
-//        next_token = next_token->next;
-//    }
-//}
-
-//void parse_statement(struct token_t *tokens)
-//void expression(struct token_t *tokens)
-//{
-//    struct token_t *token;
-//    struct exp_result_t result;
-//
-//    token = tokens;
-//    expression7(&result, &token);
-//
-//    if(result.result_type == EXP_RESULT_TYPE_VARIABLE)
-//    {
-//        printf("-->%d\n", result.result_value.var->value.ivalue);
-//    }
-//    else if(result.result_type == EXP_RESULT_TYPE_LITERAL)
-//    {
-//        printf("-->%d\n", result.result_value.int_result);
-//    }
-//    else
-//    {
-//        printf("-->%s\n", result.text);
-//    }
-//
-//
-//    //free_tokens(tokens);
-//}
-
-/* comma... */
-//void expression7(struct exp_result_t *result, struct token_t **tokens)
-//{
-//    struct token_t *token;
-//
-//    struct exp_result_t temp;
-//    //char error_buffer[128];
-//    int temp_value;
-//
-//    expression6(result, tokens);
-//
-//    //token = get_token();
-//    token = *tokens;
-//
-//    while(token && (token->token == TOKEN_COMMA))
-//    {
-//        //advance_token();
-//        *tokens = token->next;
-//        expression7(&temp, tokens);
-//
-//        /* the comma operator pretty much just throws the temp value away,
-//        given that the expression is processed left-to-right, but the comma
-//        is right-to-left associative, which means the first thing read before
-//        the first comma is the final value of the expression... */
-//
-//        token = get_token();
-//    }
-//}
 
 
-/* assignments... */
-//void expression6(struct exp_result_t *result, struct token_t **tokens)
-//{
-//    struct token_t *token;
-////    struct var_t *var;
-////    struct var_t *temp_var;
-//
-//    struct exp_result_t temp;
-//    int temp_value;
-//
-//    char error_buffer[128];
-//
-//    expression4(result, tokens);
-//
-//    //token = get_token();
-//    token = *tokens;
-//
-//    while(token && (token->token != TOKEN_SEMICOLON && (token->token == TOKEN_ASSIGN || token->token == TOKEN_PLUS_ASSIGN ||
-//                                                                                        token->token == TOKEN_MINUS_ASSIGN ||
-//                                                                                        token->token == TOKEN_MUL_ASSIGN ||
-//                                                                                        token->token == TOKEN_DIV_ASSIGN)))
-//    {
-//        //advance_token();
-//        *tokens = token->next;
-//        expression6(&temp, tokens);
-//
-//        /* left side exp... */
-//        if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!result->result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(error_buffer, "undefined identifier [%s]", result->text);
-//                strcpy(result->text, error_buffer);
-//                return;
-//            }
-//        }
-//        else if(result->result_type == EXP_RESULT_TYPE_LITERAL)
-//        {
-//            result->result_type = EXP_RESULT_TYPE_ERROR;
-//            sprintf(result->text, "literal cannot be lvalue");
-//            return;
-//        }
-//
-//
-//        /* right exp... */
-//        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!temp.result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(result->text, "undefined identifier [%s]", temp.text);
-//                return;
-//            }
-//            else
-//            {
-//                temp_value = temp.result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            temp_value = temp.result_value.int_result;
-//        }
-//
-//        switch(token->token)
-//        {
-//            case TOKEN_ASSIGN:
-//                result->result_value.var->value.ivalue = temp_value;
-//            break;
-//
-//            case TOKEN_PLUS_ASSIGN:
-//                result->result_value.var->value.ivalue += temp_value;
-//            break;
-//
-//            case TOKEN_MINUS_ASSIGN:
-//                result->result_value.var->value.ivalue -= temp_value;
-//            break;
-//
-//            case TOKEN_MUL_ASSIGN:
-//                result->result_value.var->value.ivalue *= temp_value;
-//            break;
-//
-//            case TOKEN_DIV_ASSIGN:
-//                result->result_value.var->value.ivalue /= temp_value;
-//            break;
-//        }
-//
-//        result->result_type = EXP_RESULT_TYPE_LITERAL;
-//        result->result_value.int_result = result->result_value.var->value.ivalue;
-//
-//        //token = get_token();
-//        token = *tokens;
-//    }
-//}
+struct base_exp_node_t *exp(struct parser_t *parser)
+{
+    struct base_exp_node_t *exp;
+    struct base_exp_node_t **exp_ptr = &exp;
+    comma_exp(parser, &exp_ptr);
+    return exp;
+}
 
-///* var decls... */
-//void expression5(struct exp_result_t *result, struct token_t **tokens)
-//{
-//    struct token_t *token;
-//    struct var_t *var;
-//    struct exp_result_t temp_result;
-//
-//    int var_type;
-//
-//    expression4(result);
-//
-//    //token = get_token();
-//    token = *tokens;
-//
-//    while(token && (token->token != TOKEN_SEMICOLON && token->token == TOKEN_RESERVED))
-//    {
-//        //advance_token();
-//        *tokens = token->next;
-//
-//        expression4(&temp_result);
-//
-//        switch(temp_result.result_type)
-//        {
-//            case EXP_RESULT_TYPE_VARIABLE:
-//                if(!temp_result.result_value.var)
-//                {
-//                    /* var declaration... */
-//
-//                    switch(token->reserved_token)
-//                    {
-//                        case RESERVED_TOKEN_INT:
-//                            var_type = VAR_TYPE_INT;
-//                        break;
-//                    }
-//
-//                    create_var(temp_result.text, var_type);
-//
-//                    var = get_var(temp_result.text);
-//
-//                    result->result_type = EXP_RESULT_TYPE_VARIABLE;
-//                    result->result_value.var = var;
-//                    strcpy(result->text, temp_result.text);
-//                }
-//                else
-//                {
-//                    result->result_type = EXP_RESULT_TYPE_ERROR;
-//                    sprintf(result->text, "redeclaration of identifier [%s]", temp_result.text);
-//                }
-//            break;
-//
-//            case EXP_RESULT_TYPE_LITERAL:
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(result->text, "identifier starting with number");
-//            break;
-//        }
-//
-//        return;
-//    }
-//}
+struct base_exp_node_t *new_node(uint32_t type)
+{
+    uint32_t size = sizeof(struct base_exp_node_t);
+    struct base_exp_node_t *node;
 
-/* == */
-//void expression4(struct exp_result_t *result, struct token_t **tokens)
-//{
-//    struct token_t *token;
-//
-//    struct exp_result_t temp;
-//    char error_buffer[128];
-//
-//    int result_value;
-//    int temp_value;
-//
-//    expression3(result, tokens);
-//
-//    //token = get_token();
-//    token = *tokens;
-//
-//    while(token && (token->token != TOKEN_SEMICOLON && (token->token == TOKEN_EQUALS || token->token == TOKEN_NOT_EQUALS)))
-//    {
-//        //advance_token();
-//        *tokens = token->next;
-//        expression3(&temp, tokens);
-//
-//        if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!result->result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(error_buffer, "undefined identifier [%s]", result->text);
-//                strcpy(result->text, error_buffer);
-//            }
-//            else
-//            {
-//                result_value = result->result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            result_value = result->result_value.int_result;
-//        }
-//
-//
-//
-//        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!temp.result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(result->text, "undefined identifier [%s]", temp.text);
-//            }
-//            else
-//            {
-//                temp_value = temp.result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            temp_value = temp.result_value.int_result;
-//        }
-//
-//
-//
-//        switch(token->token)
-//        {
-//            case TOKEN_EQUALS:
-//                result_value = result_value == temp_value;
-//            break;
-//
-//            case TOKEN_NOT_EQUALS:
-//                result_value = result_value != temp_value;
-//            break;
-//        }
-//
-//        result->result_type = EXP_RESULT_TYPE_LITERAL;
-//        result->result_value.int_result = result_value;
-//
-//        //token = get_token();
-//        token = *tokens;
-//    }
-//}
+    switch(type)
+    {
+        case EXP_NODE_TYPE_PRIMARY:
+            size = sizeof(struct primary_exp_node_t);
+        break;
 
-/* +- */
-//void expression3(struct exp_result_t *result, struct token_t **tokens)
-//{
-//    struct token_t *token;
-//    struct exp_result_t temp;
-//
-//    char error_buffer[128];
-//
-//    expression2(result, tokens);
-//
-//    int result_value;
-//    int temp_value;
-//
-//    //token = get_token();
-//    token = *tokens;
-//
-//    while(token && (token->token != TOKEN_SEMICOLON && (token->token == TOKEN_PLUS || token->token == TOKEN_MINUS)))
-//    {
-//        //advance_token();
-//        *tokens = token->next;
-//
-//        expression2(&temp, tokens);
-//
-//
-//
-//        if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!result->result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(error_buffer, "undefined identifier [%s]", result->text);
-//                strcpy(result->text, error_buffer);
-//            }
-//            else
-//            {
-//                result_value = result->result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            result_value = result->result_value.int_result;
-//        }
-//
-//
-//
-//        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!temp.result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(result->text, "undefined identifier [%s]", temp.text);
-//            }
-//            else
-//            {
-//                temp_value = temp.result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            temp_value = temp.result_value.int_result;
-//        }
-//
-//        switch(token->token)
-//        {
-//            case TOKEN_PLUS:
-//                result_value += temp_value;
-//            break;
-//
-//            case TOKEN_MINUS:
-//                result_value -= temp_value;
-//            break;
-//        }
-//
-//        result->result_type = EXP_RESULT_TYPE_LITERAL;
-//        result->result_value.int_result = result_value;
-//        token = *tokens;
-//        //token = get_token();
-//    }
-//}
+        case EXP_NODE_TYPE_POSTFIX:
+            size = sizeof(struct postfix_exp_node_t);
+        break;
 
-/* / * */
-//void expression2(struct exp_result_t *result, struct token_t **tokens)
-//{
-//    struct token_t *token;
-//    struct exp_result_t temp;
-//
-//    char error_buffer[512];
-//
-//    int result_value;
-//    int temp_value;
-//
-//    expression1(result, tokens);
-//
-//    //token = get_token();
-//    token = *tokens;
-//
-//    while(token && (token->token != TOKEN_SEMICOLON && (token->token == TOKEN_ASTERISC || token->token == TOKEN_DIV)))
-//    {
-//        //advance_token();
-//        *tokens = token->next;
-//        expression1(&temp, tokens);
-//
-//
-//
-//        if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!result->result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(error_buffer, "undefined identifier [%s]", result->text);
-//                strcpy(result->text, error_buffer);
-//            }
-//            else
-//            {
-//                result_value = result->result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            result_value = result->result_value.int_result;
-//        }
-//
-//
-//
-//        if(temp.result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!temp.result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(result->text, "undefined identifier [%s]", temp.text);
-//            }
-//            else
-//            {
-//                temp_value = temp.result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            temp_value = temp.result_value.int_result;
-//        }
-//
-//        switch(token->token)
-//        {
-//            case TOKEN_ASTERISC:
-//                result_value *= temp_value;
-//            break;
-//
-//            case TOKEN_DIV:
-//                result_value /= temp_value;
-//            break;
-//        }
-//
-//        result->result_type = EXP_RESULT_TYPE_LITERAL;
-//        result->result_value.int_result = result_value;
-//        token = *tokens;
-//        //token = get_token();
-//    }
-//}
+        case EXP_NODE_TYPE_UNARY:
+            size = sizeof(struct unary_exp_node_t);
+        break;
 
-/* unary +- */
-//void expression1(struct exp_result_t *result, struct token_t **tokens)
-//{
-//    struct token_t *token;
-//    int result_value;
-//
-//    char error_buffer[512];
-//
-//    int token_type = TOKEN_UNKNOWN;
-//
-//    //token = get_token();
-//    token = *tokens;
-//
-//    while(token && (token->token != TOKEN_SEMICOLON && (token->token == TOKEN_PLUS || token->token == TOKEN_MINUS)))
-//    {
-//        token_type = token_type == TOKEN_MINUS ? TOKEN_UNKNOWN : TOKEN_MINUS;
-//
-//        *tokens = token->next;
-//        token = token->next;
-//
-//        /*advance_token();
-//        token = get_token();*/
-//    }
-//
-//    expression0(result, tokens);
-//
-//    if(token_type == TOKEN_MINUS)
-//    {
-//        if(result->result_type == EXP_RESULT_TYPE_VARIABLE)
-//        {
-//            if(!result->result_value.var)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_ERROR;
-//                sprintf(error_buffer, "undefined identifier [%s]", result->text);
-//                strcpy(result->text, error_buffer);
-//                return;
-//            }
-//            else
-//            {
-//                result_value = result->result_value.var->value.ivalue;
-//            }
-//        }
-//        else
-//        {
-//            result_value = result->result_value.int_result;
-//        }
-//
-//        result_value = -result_value;
-//        result->result_type = EXP_RESULT_TYPE_LITERAL;
-//        result->result_value.int_result = result_value;
-//    }
-//}
+        case EXP_NODE_TYPE_MULTIPLICATIVE:
+            size = sizeof(struct multiplicative_exp_node_t);
+        break;
 
-/* () number... */
-//void expression0(struct exp_result_t *result, struct token_t **tokens)
-//{
-//    struct token_t *token;
-//    struct var_t *var;
-//
-//    struct exp_result_t temp;
-//    int var_type;
-//
-//    //token = get_token();
-//    token = *tokens;
-//
-//    if(token && token->token != TOKEN_SEMICOLON)
-//    {
-//        if(token->token == TOKEN_OPARENTHESIS)
-//        {
-//            //advance_token();
-//            *tokens = token->next;
-//            expression7(result, tokens);
-//            token = *tokens;
-//            *tokens = token->next;
-//            //advance_token();
-//        }
-//        else
-//        {
-//            if(token->token == TOKEN_NUMBER)
-//            {
-//                result->result_type = EXP_RESULT_TYPE_LITERAL;
-//                result->result_value.int_result = atoi(token->text);
-//                *tokens = token->next;
-//                //advance_token();
-//            }
-//            else if(token->token == TOKEN_ID)
-//            {
-//                var = get_var(token->text);
-//
-//                result->result_type = EXP_RESULT_TYPE_VARIABLE;
-//                result->result_value.var = var;
-//                strcpy(result->text, token->text);
-//                *tokens = token->next;
-//                //advance_token();
-//            }
-//        }
-//    }
-//}
+        case EXP_NODE_TYPE_ADDITIVE:
+            size = sizeof(struct additive_exp_node_t);
+        break;
+    }
+
+    node = calloc(1, size);
+    node->type = type;
+}
 
 /* return... */
-struct exp_result_t exp_16(struct parser_t *parser)
+void comma_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_15(parser);
+    assignment_exp(parser, cur);
 }
 
 
 /* ','... */
-struct exp_result_t exp_15(struct parser_t *parser)
+void assignment_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_14(parser);
+    conditional_exp(parser, cur);
 }
 
 /* assignment '=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '&=', '|=', '^='... */
-struct exp_result_t exp_14(struct parser_t *parser)
+void conditional_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_13(parser);
+    logical_or_exp(parser, cur);
 }
 
 /* ternary '?:' */
-struct exp_result_t exp_13(struct parser_t *parser)
+void logical_or_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_12(parser);
+    logical_and_exp(parser, cur);
 }
 
 /* logical '||'... */
-struct exp_result_t exp_12(struct parser_t *parser)
+void logical_and_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_11(parser);
+    or_exp(parser, cur);
 }
 
 /* logical '&&'... */
-struct exp_result_t exp_11(struct parser_t *parser)
+void or_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_10(parser);
+    xor_exp(parser, cur);
 }
 
 /* bitwise '|'... */
-struct exp_result_t exp_10(struct parser_t *parser)
+void xor_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_9(parser);
+    and_exp(parser, cur);
 }
 
 /* bitwise '^'... */
-struct exp_result_t exp_9(struct parser_t *parser)
+void and_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_8(parser);
+    equality_exp(parser, cur);
 }
 
 /* bitwise '&' ... */
-struct exp_result_t exp_8(struct parser_t *parser)
+void equality_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_7(parser);
+    relational_exp(parser, cur);
 }
 
 /* relational '==', '!=' ... */
-struct exp_result_t exp_7(struct parser_t *parser)
+void relational_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_6(parser);
+    shift_exp(parser, cur);
 }
 
 /* relational '<', '<=', '>', '>=' ... */
-struct exp_result_t exp_6(struct parser_t *parser)
+void shift_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_5(parser);
+    additive_exp(parser, cur);
 }
 
 /* bitwise '<<', '>>' ... */
-struct exp_result_t exp_5(struct parser_t *parser)
+void additive_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
-    return exp_4(parser);
+    struct additive_exp_node_t *node;
+    struct token_t *token;
+    uint32_t node_type;
+
+    multiplicative_exp(parser, cur);
+    token = parser->current_token;
+
+    if(token->token_type == TOKEN_PUNCTUATOR)
+    {
+        switch(token->token_name)
+        {
+            case TOKEN_PUNCTUATOR_PLUS:
+                node_type = ADDITIVE_EXP_NODE_TYPE_ADD;
+            break;
+
+            case TOKEN_PUNCTUATOR_MINUS:
+                node_type = ADDITIVE_EXP_NODE_TYPE_SUB;
+            break;
+
+            default:
+                return;
+        }
+
+        advance_token(parser);
+        node = (struct additive_exp_node_t *)new_node(EXP_NODE_TYPE_ADDITIVE);
+        node->type = node_type;
+        **cur = node;
+        *cur = &node->base.next;
+        additive_exp(parser, cur);
+    }
 }
 
 /* arithmetic '+'. '-'... */
-struct exp_result_t exp_4(struct parser_t *parser)
+void multiplicative_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
+    struct multiplicative_exp_node_t *node;
     struct token_t *token;
-    struct exp_result_t result;
-    struct exp_result_t rec_result;
+    uint32_t node_type;
 
-    result = exp_3(parser);
+    cast_exp(parser, cur);
     token = parser->current_token;
-
 
     if(token->token_type == TOKEN_PUNCTUATOR)
     {
-        if(token->token_name == TOKEN_PUNCTUATOR_PLUS || token->token_name == TOKEN_PUNCTUATOR_MINUS)
+        switch(token->token_name)
         {
-            advance_token(parser);
+            case TOKEN_PUNCTUATOR_ASTERISC:
+                node_type = MULTIPLICATIVE_EXP_NODE_TYPE_MULT;
+            break;
 
-            rec_result = exp_3(parser);
+            case TOKEN_PUNCTUATOR_SLASH:
+                node_type = MULTIPLICATIVE_EXP_NODE_TYPE_DIV;
+            break;
 
-            switch(token->token_name)
-            {
-                case TOKEN_PUNCTUATOR_PLUS:
-                    printf("reg%d = reg%d + reg%d\n", parser->reg_index, result.immediate, rec_result.immediate);
-                break;
+            case TOKEN_PUNCTUATOR_PERCENT:
+                node_type = MULTIPLICATIVE_EXP_NODE_TYPE_MOD;
+            break;
 
-                case TOKEN_PUNCTUATOR_MINUS:
-                    printf("reg%d = reg%d - reg%d\n", parser->reg_index, result.immediate, rec_result.immediate);
-                break;
-            }
-
-            result.immediate = parser->reg_index;
-            parser->reg_index++;
+            default:
+                return;
         }
-    }
 
-    return result;
+        advance_token(parser);
+        node = (struct multiplicative_exp_node_t *)new_node(EXP_NODE_TYPE_MULTIPLICATIVE);
+        node->type = node_type;
+        **cur = node;
+        *cur = &node->base.next;
+        multiplicative_exp(parser, cur);
+    }
 }
 
 /* arithmetic '*', '/', '%' ... */
-struct exp_result_t exp_3(struct parser_t *parser)
+void cast_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
     struct token_t *token;
-    struct exp_result_t result;
-    struct exp_result_t rec_result;
 
-    result = exp_2(parser);
-
-    token = parser->current_token;
+    unary_exp(parser, cur);
+//    token = parser->current_token;
 
     if(token->token_type == TOKEN_PUNCTUATOR)
     {
-        if(token->token_name == TOKEN_PUNCTUATOR_ASTERISC ||
-           token->token_name == TOKEN_PUNCTUATOR_SLASH)
-        {
-            advance_token(parser);
-            rec_result = exp_3(parser);
-
-            switch(token->token_name)
-            {
-                case TOKEN_PUNCTUATOR_ASTERISC:
-                    printf("reg%d = reg%d * reg%d\n", parser->reg_index, result.immediate, rec_result.immediate);
-                break;
-
-                case TOKEN_PUNCTUATOR_SLASH:
-                   printf("reg%d = reg%d / reg%d\n", parser->reg_index, result.immediate, rec_result.immediate);
-                break;
-            }
-
-            result.immediate = parser->reg_index;
-            parser->reg_index++;
-        }
+//        if(token->token_name == TOKEN_PUNCTUATOR_ASTERISC ||
+//           token->token_name == TOKEN_PUNCTUATOR_SLASH)
+//        {
+//            advance_token(parser);
+//            rec_result = exp_3(parser);
+//
+//            switch(token->token_name)
+//            {
+//                case TOKEN_PUNCTUATOR_ASTERISC:
+//                    printf("reg%d = reg%d * reg%d\n", parser->reg_index, result.immediate, rec_result.immediate);
+//                break;
+//
+//                case TOKEN_PUNCTUATOR_SLASH:
+//                   printf("reg%d = reg%d / reg%d\n", parser->reg_index, result.immediate, rec_result.immediate);
+//                break;
+//            }
+//
+//            result.immediate = parser->reg_index;
+//            parser->reg_index++;
+//        }
     }
-
-
-    return result;
 }
 
 /* unary '*', '&', '+', '-', prefix '--', '++'... */
-struct exp_result_t exp_2(struct parser_t *parser)
+void unary_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
     struct token_t *token;
-    struct exp_result_t result;
+    struct unary_exp_node_t *node;
+    uint32_t node_type;
+    uint32_t has_unary = 0;
 
     token = parser->current_token;
 
     switch(token->token_type)
     {
-//            case TOKEN_KEYWORD:
-//                switch(token->token_name)
-//                {
-//                    case TOKEN_KEYWORD_SIZEOF:
-//                        node = calloc(sizeof(struct ast_node_t), 1);
-//                        node->token = token;
-//
-//                        advance_token(parser);
-//                        node->left = exp_2(parser);
-//                    break;
-//
-//                    default:
-//                        node = exp_2(parser);
-//                    break;
-//                }
-//            break;
-
-        case TOKEN_PUNCTUATOR:
-
+        case TOKEN_KEYWORD:
+            has_unary = 1;
             switch(token->token_name)
             {
-                case TOKEN_PUNCTUATOR_ASTERISC:
-                case TOKEN_PUNCTUATOR_PLUS:
-                case TOKEN_PUNCTUATOR_MINUS:
-                case TOKEN_PUNCTUATOR_AMPERSAND:
-                case TOKEN_PUNCTUATOR_INCREMENT:
-                case TOKEN_PUNCTUATOR_DECREMENT:
-
-                    result = exp_2(parser);
-
-                    switch(token->token_name)
-                    {
-                        case TOKEN_PUNCTUATOR_ASTERISC:
-                            printf("reg%d = [reg%d]\n", result.immediate, result.immediate);
-                        break;
-
-                        case TOKEN_PUNCTUATOR_PLUS:
-                            printf("reg%d = +reg%d\n", result.immediate, result.immediate);
-                        break;
-
-                        case TOKEN_PUNCTUATOR_MINUS:
-                            printf("reg%d = -reg%d\n", result.immediate, result.immediate);
-                        break;
-
-                        case TOKEN_PUNCTUATOR_AMPERSAND:
-                            printf("reg%d = &reg%d\n", result.immediate, result.immediate);
-                        break;
-
-                        case TOKEN_PUNCTUATOR_INCREMENT:
-
-                        break;
-
-                        case TOKEN_PUNCTUATOR_DECREMENT:
-
-                        break;
-                    }
-
-                break;
-
-                default:
-                    result = exp_1(parser);
+                case TOKEN_KEYWORD_SIZEOF:
+                    node_type = UNARY_EXP_NODE_TYPE_SIZEOF;
                 break;
             }
         break;
 
-        default:
-            result = exp_1(parser);
+        case TOKEN_PUNCTUATOR:
+            has_unary = 1;
+            switch(token->token_name)
+            {
+                case TOKEN_PUNCTUATOR_ASTERISC:
+                    node_type = UNARY_EXP_NODE_TYPE_DEREFERENCE;
+                break;
+
+                case TOKEN_PUNCTUATOR_PLUS:
+                    node_type = UNARY_EXP_NODE_TYPE_PLUS;
+                break;
+
+                case TOKEN_PUNCTUATOR_MINUS:
+                    node_type = UNARY_EXP_NODE_TYPE_MINUS;
+                break;
+
+                case TOKEN_PUNCTUATOR_AMPERSAND:
+                    node_type = UNARY_EXP_NODE_TYPE_ADDRESS_OF;
+                break;
+
+                case TOKEN_PUNCTUATOR_INCREMENT:
+                    node_type = UNARY_EXP_NODE_TYPE_INCREMENT;
+                break;
+
+                case TOKEN_PUNCTUATOR_DECREMENT:
+                    node_type = UNARY_EXP_NODE_TYPE_DECREMENT;
+                break;
+
+                case TOKEN_PUNCTUATOR_EXCLAMATION:
+                    node_type = UNARY_EXP_NODE_TYPE_LOGICAL_NOT;
+                break;
+
+                case TOKEN_PUNCTUATOR_TILDE:
+                    node_type = UNARY_EXP_NODE_TYPE_BITWISE_NOT;
+                break;
+
+                default:
+                    has_unary = 0;
+                break;
+            }
         break;
     }
 
+    if(has_unary)
+    {
+        node = (struct unary_exp_node_t *)new_node(EXP_NODE_TYPE_UNARY);
+        node->type = node_type;
+        **cur = node;
+        *cur = &node->base.next;
+        advance_token(parser);
+        unary_exp(parser, cur);
+    }
 
-    return result;
+    postfix_exp(parser, cur);
 }
 
 /* '()', '[]', '{}', postfix '++', '--', '.', '->', ... */
-struct exp_result_t exp_1(struct parser_t *parser)
+void postfix_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
     struct token_t *token;
-    struct exp_result_t result;
-
-    result = exp_0(parser);
+    struct base_exp_node_t *rec_node;
+    struct postfix_exp_node_t *node;
+    uint32_t node_type;
+    primary_exp(parser, cur);
     token = parser->current_token;
 
     if(token->token_type == TOKEN_PUNCTUATOR)
@@ -816,43 +308,59 @@ struct exp_result_t exp_1(struct parser_t *parser)
         switch(token->token_name)
         {
             case TOKEN_PUNCTUATOR_OPARENTHESIS:
+                node_type = POSTFIX_EXP_NODE_TYPE_FUNC_CALL;
+            break;
+
             case TOKEN_PUNCTUATOR_OBRACKET:
-            case TOKEN_PUNCTUATOR_OBRACE:
-                advance_token(parser);
-                result = exp_16(parser);
-                advance_token(parser);
+                node_type = POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX;
             break;
 
             case TOKEN_PUNCTUATOR_INCREMENT:
-                //printf("reg%d++\n", result.immediate);
-                advance_token(parser);
+                node_type = POSTFIX_EXP_NODE_TYPE_INCREMENT;
             break;
 
             case TOKEN_PUNCTUATOR_DECREMENT:
-                //printf("reg%d--\n", result.immediate);
-                advance_token(parser);
+                node_type = POSTFIX_EXP_NODE_TYPE_DECREMENT;
             break;
 
             case TOKEN_PUNCTUATOR_DOT:
-
+                node_type = POSTFIX_EXP_NODE_TYPE_DOT;
             break;
 
             case TOKEN_PUNCTUATOR_ARROW:
+                node_type = POSTFIX_EXP_NODE_TYPE_ARROW;
+            break;
 
+            default:
+                return;
             break;
         }
+
+        advance_token(parser);
+        node = (struct postfix_exp_node_t *)new_node(EXP_NODE_TYPE_POSTFIX);
+        node->type = node_type;
+
+        **cur = node;
+        *cur = &node->base.next;
+
+        if(node_type == POSTFIX_EXP_NODE_TYPE_FUNC_CALL ||
+           node_type == POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX)
+        {
+            comma_exp(parser, cur);
+            advance_token(parser);
+        }
+        else
+        {
+            postfix_exp(parser, cur);
+        }
     }
-
-
-    return result;
 }
 
-/* literals, identifiers ... */
-struct exp_result_t exp_0(struct parser_t *parser)
+/* literals, constants, identifiers ... */
+void primary_exp(struct parser_t *parser, struct base_exp_node_t ***cur)
 {
     struct token_t *token;
-    struct exp_result_t result;
-
+    struct primary_exp_node_t *node = NULL;
     token = parser->current_token;
 
     if(token)
@@ -860,58 +368,46 @@ struct exp_result_t exp_0(struct parser_t *parser)
         switch(token->token_type)
         {
             case TOKEN_IDENTIFIER:
-                //printf("reg%d = mem\n", parser->reg_index);
-                //result.immediate = parser->reg_index;
-                //parser->reg_index++;
+                node = (struct primary_exp_node_t *)new_node(EXP_NODE_TYPE_PRIMARY);
+                node->type = PRIMARY_EXP_NODE_TYPE_IDENTIFIER;
+                node->constant.string_constant = strdup(token->constant.string_constant);
                 advance_token(parser);
             break;
 
             case TOKEN_CONSTANT:
-                //printf("reg%d = constant\n", parser->reg_index);
-                //result.immediate = parser->reg_index;
-                //parser->reg_index++;
+                node = (struct primary_exp_node_t *)new_node(EXP_NODE_TYPE_PRIMARY);
+                switch(token->token_name)
+                {
+                    case TOKEN_CONSTANT_INTEGER:
+                        node->type = PRIMARY_EXP_NODE_TYPE_INTEGER_CONSTANT;
+                        node->constant.int_constant = token->constant.int_constant;
+                    break;
+                }
                 advance_token(parser);
             break;
 
-            default:
-                /* if it falls here, something is wrong... */
+            case TOKEN_STRING_LITERAL:
+                node = (struct primary_exp_node_t *)new_node(EXP_NODE_TYPE_PRIMARY);
+                node->type = PRIMARY_EXP_NODE_TYPE_STRING_LITERAL;
+                node->constant.string_constant = strdup(token->constant.string_constant);
+                advance_token(parser);
             break;
+
+            case TOKEN_PUNCTUATOR:
+                if(token->token_name == TOKEN_PUNCTUATOR_OPARENTHESIS)
+                {
+                    advance_token(parser);
+                    comma_exp(parser, cur);
+                    advance_token(parser);
+                    return;
+                }
+            break;
+
+            default:
+                return;
         }
+
+        **cur = node;
+        *cur = &node->base.next;
     }
-
-    return result;
 }
-
-
-//
-//void traverse_ast(struct ast_node_t *ast)
-//{
-//    static int depth = -1;
-//    int i;
-//
-//    depth++;
-//
-//    if(ast)
-//    {
-//        for(i = 0; i < depth; i++)
-//        {
-//            putchar(' ');
-//        }
-//        translate_token(ast->token);
-//        traverse_ast(ast->left);
-//        traverse_ast(ast->right);
-//    }
-//    depth--;
-//}
-
-
-
-
-
-
-
-
-
-
-
-

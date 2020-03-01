@@ -23,5 +23,17 @@ struct object_t
     unsigned int offset;            /* offset from the segment pointer... */
 };
 
+struct function_t
+{
+    struct object_t *object;
+};
+
+struct scope_t
+{
+    struct scope_t *parent;
+
+    struct object_t *objects;
+    struct object_t *last_object;
+};
 
 #endif // OBJ_H

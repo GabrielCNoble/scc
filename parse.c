@@ -1,6 +1,5 @@
 #include "parse.h"
 #include "type.h"
-#include "exp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,6 +66,13 @@ int is_storage_class_specifier(struct token_t *token)
     }
 
     return 0;
+}
+
+int is_declaration_specifier(struct token_t *token)
+{
+    return is_storage_class_specifier(token) ||
+           is_type_qualifier(token) ||
+           is_type_specifier(token);
 }
 
 int is_typedef_name(struct token_t *token)
@@ -181,8 +187,16 @@ char *type_string(struct base_type_t *type)
 
 void advance_token(struct parser_t *parser)
 {
-    parser->prev_token = parser->current_token;
-    parser->current_token = parser->current_token->next;
+    if(!parser->current_token)
+    {
+        parser->current_token = parser->tokens;
+    }
+    else if(parser->current_token->token_type != TOKEN_EOF)
+    {
+        parser->current_token = parser->current_token->next;
+    }
+
+    parser->next_token = parser->current_token->next;
 }
 
 /*
@@ -241,9 +255,9 @@ struct object_t *create_object(struct parser_t *parser, struct base_type_t *type
     struct object_t *object;
     struct identifier_type_t *object_type;
 
-    if(type->type == TYPE_REFERENCE)
+    if(type->type == TYPE_LINK)
     {
-        type = ((struct reference_type_t *)type)->type;
+        type = ((struct link_type_t *)type)->type;
     }
 
     assert(type->type == TYPE_IDENTIFIER);
@@ -366,15 +380,15 @@ struct base_type_t *copy_type(struct base_type_t *type)
     struct base_type_t *first_type = NULL;
     struct base_type_t *last_type = NULL;
 
-    struct reference_type_t *reference;
-    struct reference_type_t *args;
-    struct reference_type_t *last_arg;
+    struct link_type_t *link;
+    struct link_type_t *args;
+    struct link_type_t *last_arg;
     struct function_type_t *function;
     struct aggretage_type_t *aggretage;
 
     struct aggretage_type_t *aggretage_type;
     struct function_type_t *function_type;
-    struct reference_type_t *reference_type;
+    struct link_type_t *link_type;
 
     int size;
 
@@ -420,8 +434,8 @@ struct base_type_t *copy_type(struct base_type_t *type)
                 size = sizeof(struct identifier_type_t);
             break;
 
-            case TYPE_REFERENCE:
-                size = sizeof(struct reference_type_t);
+            case TYPE_LINK:
+                size = sizeof(struct link_type_t);
             break;
         }
 
@@ -433,13 +447,13 @@ struct base_type_t *copy_type(struct base_type_t *type)
         {
             function_type = (struct function_type_t *)new_type;
             function = (struct function_type_t *)type;
-            function_type->args = copy_type(function->args);
+            function_type->args = (struct link_type_t *)copy_type((struct base_type_t *)function->args);
         }
-        else if(new_type->type == TYPE_REFERENCE)
+        else if(new_type->type == TYPE_LINK)
         {
-            reference_type = (struct reference_type_t *)new_type;
-            reference = (struct reference_type_t *)type;
-            reference_type->type = copy_type(reference->type);
+            link_type = (struct link_type_t *)new_type;
+            link = (struct link_type_t *)type;
+            link_type->type = copy_type(link->type);
         }
 
         if(!first_type)
@@ -459,62 +473,6 @@ struct base_type_t *copy_type(struct base_type_t *type)
     return first_type;
 }
 
-int validate_type(struct base_type_t *type)
-{
-    int has_short = 0;
-    int has_int = 0;
-    int id_found = 0;
-    int has_const = 0;
-    int has_volatile = 0;
-    int has_restrict = 0;
-
-    int cur_decl_token;
-
-//    while(type)
-//    {
-//        switch(type->type)
-//        {
-//            case TYPE_INT:
-//            case TYPE_SHORT:
-//            case TYPE_FLOAT:
-//            case TYPE_DOUBLE:
-//            case TYPE_CHAR:
-//                switch(type->type)
-//                {
-//                    case TYPE_INT:
-//                        has_int =
-//                    break;
-//                }
-//                has_const = 0;
-//                has_volatile = 0;
-//                cur_decl_token = DECL_TOKEN_SPECIFIER;
-//            break;
-//
-//            case TYPE_CONST:
-//            case TYPE_VOLATILE:
-//            case TYPE_RESTRICT:
-//                switch(type->type)
-//                {
-//                    case TYPE_CONST:
-//                        has_const = 1;
-//                    break;
-//
-//                    case TYPE_VOLATILE:
-//                        has_volatile = 1;
-//                    break;
-//
-//                    case TYPE_RESTRICT:
-//                        has_restrict = 1;
-//                    break;
-//                }
-//                cur_decl_token = DECL_TOKEN_QUALIFIER;
-//            break;
-//        }
-//
-//        type = type->next;
-//    }
-}
-
 /*
 ==========================================================================================
 ==========================================================================================
@@ -524,45 +482,78 @@ int validate_type(struct base_type_t *type)
 
 
 #define SCOPE_MAX_DEPTH 8192
+#define TEXT_BUFFER_SIZE 8192
 
 void parse_tokens(struct token_t *tokens)
 {
-    struct parser_t parser;
-
-    struct reference_type_t *types;
-
-    memset(&parser, 0, sizeof(struct parser_t));
-
-    parser.tokens = tokens;
-    parser.current_token = tokens;
-
-    parser.scope_stack_top = -1;
-    parser.scope_stack = calloc(sizeof(struct scope_t *), SCOPE_MAX_DEPTH);
-
-    parser.global_bytecode.buffer_size = 1024;
-    parser.global_bytecode.bytecode = calloc(parser.global_bytecode.buffer_size, 1);
-
-    parser.reg_index = 0;
-
-    parser.declaration_depth = -1;
-    /* global (file) scope... */
-    push_scope(&parser);
-
-    parse_declaration(&parser, 0);
-
-    //while(parser.current_token->token_type != TOKEN_EOF)
-    {
-//        if(is_type_specifier(parser.current_token))
+//    struct parser_t parser;
+//
+//    struct base_type_t *types;
+//    struct link_type_t *link;
+//
+//    memset(&parser, 0, sizeof(struct parser_t));
+//
+//    parser.tokens = tokens;
+//    parser.current_token = tokens;
+//
+//    parser.scope_stack_top = -1;
+//    parser.scope_stack = calloc(sizeof(struct scope_t *), SCOPE_MAX_DEPTH);
+//
+////    parser.global_bytecode.buffer_size = 1024;
+////    parser.global_bytecode.bytecode = calloc(parser.global_bytecode.buffer_size, 1);
+//
+//    parser.reg_index = 0;
+//
+//    parser.declaration_depth = -1;
+//    /* global (file) scope... */
+//    push_scope(&parser);
+//
+////    types = parse_declaration(&parser, 0);
+////    link = calloc(1, sizeof(struct link_type_t));
+////    link->base.type = TYPE_LINK;
+////    link->type = types;
+////    translate_type(link, 0);
+//
+//    while(parser.current_token->token_type != TOKEN_EOF)
+//    {
+////        if(is_type_specifier(parser.current_token))
+////        {
+////            types = (struct reference_type_t *)parse_declaration(&parser);
+////        }
+////        else
+////        {
+////            advance_token(&parser);
+////        }
+//
+//        //exp_16(&parser);
+//        if(is_declaration_specifier(parser.current_token))
 //        {
-//            types = (struct reference_type_t *)parse_declaration(&parser);
+//            parse_declaration(&parser, 0);
 //        }
 //        else
 //        {
-//            advance_token(&parser);
+//            parse_expression_statement(&parser);
 //        }
+//    }
+//
+//    pop_scope(&parser);
+}
 
-        //exp_16(&parser);
-    }
+void parse(char *text)
+{
+    struct parser_t parser = {};
+
+    parser.scope_stack_top = -1;
+    parser.scope_stack = calloc(sizeof(struct scope_t *), SCOPE_MAX_DEPTH);
+    parser.tokens = lex_tokens(text);
+    advance_token(&parser);
+    push_scope(&parser);
+
+    parse_expression_statement(&parser);
+//    while(parser.current_token->token_type != TOKEN_EOF)
+//    {
+//
+//    }
 
     pop_scope(&parser);
 }
@@ -588,17 +579,10 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
 
     struct object_t *object;
     int old_function_style;
-
-//    struct aggretage_type_t *aggretage_type;
     struct identifier_type_t *identifier;
-
-    struct identifier_type_t *identifiers;
-    struct identifier_type_t *last_identifier;
-
     struct token_t *next_token;
-
-    struct reference_type_t *type_reference = NULL;
-    struct reference_type_t *prev_type_reference;
+    struct link_type_t *link = NULL;
+    struct link_type_t *prev_link;
 
     parser->declaration_depth++;
 
@@ -635,32 +619,41 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
 
     */
 
-    if(is_type_specifier(parser->current_token) || is_type_qualifier(parser->current_token))
+    if(is_declaration_specifier(parser->current_token))
     {
-        while(is_type_specifier(parser->current_token) || is_type_qualifier(parser->current_token))
+        while(is_declaration_specifier(parser->current_token))
         {
             if(parser->current_token->token_name == TOKEN_KEYWORD_STRUCT ||
                parser->current_token->token_name == TOKEN_KEYWORD_UNION)
             {
-                next_token = parser->current_token->next;
+//                lookahead_token(&parser);
+//                next_token = parser->current_token->next;
+                advance_token(parser);
                 new_type = NULL;
 
-                if(next_token->token_type == TOKEN_IDENTIFIER)
+                if(parser->current_token->token_type == TOKEN_IDENTIFIER)
                 {
-                    new_type = get_aggregate_type(parser, next_token->text);
-                    next_token = next_token->next;
+                    /* we got an identifier after the struct keyword, so look
+                    for a type with this name */
+                    new_type = get_aggregate_type(parser, parser->current_token->constant.string_constant);
+//                    next_token = next_token->next;
+                    advance_token(parser);
                 }
 
-                if(next_token->token_type == TOKEN_PUNCTUATOR &&
-                   next_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
+                if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
+                   parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
                 {
                     if(new_type)
                     {
-                        /* error: redefinition of aggregate type... */
+                        /* error: redefinition of aggregate type */
                     }
 
-                    /* we're declaring a struct/union here... */
+                    /* we're declaring a struct/union here */
                     new_type = parse_aggregate_declaration(parser);
+                }
+                else
+                {
+                    /* error: expecting token '{' */
                 }
             }
             else
@@ -668,8 +661,6 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
                 new_type = calloc(sizeof(struct base_type_t), 1);
                 new_type->type = type_from_token(parser->current_token);
                 advance_token(parser);
-
-
             }
 
             if(!specifiers_qualifiers)
@@ -686,13 +677,16 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
     }
     else if(parser->current_token->token_type == TOKEN_IDENTIFIER)
     {
+        /* this token is something other than any valid declaration
+        specifier, so test it to see if it's a typedef'd name */
         if(is_typedef_name(parser->current_token))
         {
 
         }
         else
         {
-            /* error: unknown type... */
+            /* nope, not a typedef */
+            /* error: unknown type */
         }
     }
 
@@ -706,8 +700,8 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
         if(declarator)
         {
             /* got a declarator, which possibly have a lot of stuff linked,
-            so find the end of the declarator and append the declaration-specifier
-            we found... */
+            so find the end of the declarator and append the declaration specifiers
+            we found */
             temp_type = declarator;
 
             while(temp_type->next)
@@ -720,9 +714,9 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
             current_type = declarator;
         }
 
-        /* having an declarator here is not obligatory, given that this
+        /* having a declarator here is not obligatory, given that this
         code will be used to find out the type when the type-cast operator
-        gets used... */
+        gets used */
 
         if(!parser->declaration_depth)
         {
@@ -738,7 +732,7 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
                 {
                     case TYPE_FUNCTION:
                         function_type = (struct function_type_t *)temp_type;
-                        type_reference = function_type->args;
+                        link = function_type->args;
 
                         if(function_type->arg_count)
                         {
@@ -846,9 +840,9 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
     struct array_type_t *array_type = NULL;
     struct base_type_t *pointer_type = NULL;
     struct identifier_type_t *identifier = NULL;
-    struct reference_type_t *params_or_fields = NULL;
-    struct reference_type_t *param_or_field = NULL;
-    struct reference_type_t *last_param_or_field = NULL;
+    struct link_type_t *params_or_fields = NULL;
+    struct link_type_t *param_or_field = NULL;
+    struct link_type_t *last_param_or_field = NULL;
 
     /*
         A declarator is defined as:
@@ -994,7 +988,7 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
 
             identifier->base.next = NULL;
             identifier->base.type = TYPE_IDENTIFIER;
-            identifier->identifier = parser->current_token->text;
+            identifier->identifier = parser->current_token->constant.string_constant;
 
             advance_token(parser);
         break;
@@ -1063,7 +1057,7 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
                     {
                         function_type->arg_count++;
 
-                        param_or_field = calloc(sizeof(struct reference_type_t), 1);
+                        param_or_field = calloc(sizeof(struct link_type_t), 1);
                         param_or_field->type = new_type;
 
                         if(!params_or_fields)
@@ -1072,7 +1066,7 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
                         }
                         else
                         {
-                            last_param_or_field->base.next = param_or_field;
+                            last_param_or_field->base.next = (struct base_type_t *)param_or_field;
                         }
 
                         last_param_or_field = param_or_field;
@@ -1256,9 +1250,9 @@ struct base_type_t *parse_aggregate_declaration(struct parser_t *parser)
     struct aggretage_type_t *type;
 
     struct base_type_t *field_type = NULL;
-    struct reference_type_t *field = NULL;
-    struct reference_type_t *fields = NULL;
-    struct reference_type_t *last_field = NULL;
+    struct link_type_t *field = NULL;
+    struct link_type_t *fields = NULL;
+    struct link_type_t *last_field = NULL;
 
     type = calloc(sizeof(struct aggretage_type_t), 1);
 
@@ -1284,7 +1278,7 @@ struct base_type_t *parse_aggregate_declaration(struct parser_t *parser)
 
     if(parser->current_token->token_type == TOKEN_IDENTIFIER)
     {
-        type->name = strdup(parser->current_token->text);
+        type->name = strdup(parser->current_token->constant.string_constant);
         advance_token(parser);
     }
 
@@ -1292,16 +1286,18 @@ struct base_type_t *parse_aggregate_declaration(struct parser_t *parser)
     if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
        parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
     {
+        /* struct/union (identifier) { ... */
         advance_token(parser);
 
         while(1)
         {
+            /* parse the fields, which can be structs as well */
             field_type = parse_declaration(parser, 0);
 
-            field = calloc(sizeof(struct reference_type_t ), 1);
+            field = calloc(sizeof(struct link_type_t ), 1);
 
             field->type = field_type;
-            field->base.type = TYPE_REFERENCE;
+            field->base.type = TYPE_LINK;
             field->base.next = NULL;
 
             if(!fields)
@@ -1335,97 +1331,94 @@ struct base_type_t *parse_aggregate_declaration(struct parser_t *parser)
     return (struct base_type_t *)type;
 }
 
-
-
-
 void parse_statement(struct parser_t *parser)
 {
     struct token_t *token;
 
-    switch(parser->current_token->token_type)
-    {
-        case TOKEN_KEYWORD:
-            switch(parser->current_token->token_name)
-            {
-                case TOKEN_KEYWORD_IF:
-                    /* if statement... */
-
-                    /* 'if' */
-                    advance_token(parser);
-
-                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
-                       parser->current_token->token_name == TOKEN_PUNCTUATOR_OPARENTHESIS)
-                    {
-
-                        /* parse expression here... */
-
-                        if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
-                           parser->current_token->token_name == TOKEN_PUNCTUATOR_CPARENTHESIS)
-                        {
-                            /* ')' */
-                            advance_token(parser);
-                        }
-                        else
-                        {
-                            /* error: expecting token ')'... */
-                        }
-                    }
-                    else
-                    {
-                        /* error: expecting token '('... */
-                    }
-                break;
-
-                case TOKEN_KEYWORD_SWITCH:
-                    /* switch statement... */
-
-                    /* 'switch' */
-                    advance_token(parser);
-
-                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
-                       parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
-                    {
-
-                        /* parse compound statement here. The compound statement parsing
-                        routine will already skip '{' and '}'... */
-                    }
-                    else
-                    {
-                        /* error: expecting token '{'... */
-                    }
-
-                break;
-
-                case TOKEN_KEYWORD_FOR:
-                case TOKEN_KEYWORD_WHILE:
-                case TOKEN_KEYWORD_DO:
-
-                    /* for/while/do... */
-                    advance_token(parser);
-
-                break;
-
-
-                default:
-                    /* everything else is wrong... */
-                break;
-            }
-        break;
-
-        case TOKEN_PUNCTUATOR:
-            if(parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
-            {
-               /* compound statement... */
-            }
-            else
-            {
-                /* error: */
-            }
-        break;
-    }
+//    switch(parser->current_token->token_type)
+//    {
+//        case TOKEN_KEYWORD:
+//            switch(parser->current_token->token_name)
+//            {
+//                case TOKEN_KEYWORD_IF:
+//                    /* if statement... */
+//
+//                    /* 'if' */
+//                    advance_token(parser);
+//
+//                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
+//                       parser->current_token->token_name == TOKEN_PUNCTUATOR_OPARENTHESIS)
+//                    {
+//
+//                        /* parse expression here... */
+//
+//                        if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
+//                           parser->current_token->token_name == TOKEN_PUNCTUATOR_CPARENTHESIS)
+//                        {
+//                            /* ')' */
+//                            advance_token(parser);
+//                        }
+//                        else
+//                        {
+//                            /* error: expecting token ')'... */
+//                        }
+//                    }
+//                    else
+//                    {
+//                        /* error: expecting token '('... */
+//                    }
+//                break;
+//
+//                case TOKEN_KEYWORD_SWITCH:
+//                    /* switch statement... */
+//
+//                    /* 'switch' */
+//                    advance_token(parser);
+//
+//                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
+//                       parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
+//                    {
+//
+//                        /* parse compound statement here. The compound statement parsing
+//                        routine will already skip '{' and '}'... */
+//                    }
+//                    else
+//                    {
+//                        /* error: expecting token '{'... */
+//                    }
+//
+//                break;
+//
+//                case TOKEN_KEYWORD_FOR:
+//                case TOKEN_KEYWORD_WHILE:
+//                case TOKEN_KEYWORD_DO:
+//
+//                    /* for/while/do... */
+//                    advance_token(parser);
+//
+//                break;
+//
+//
+//                default:
+//                    /* everything else is wrong... */
+//                break;
+//            }
+//        break;
+//
+//        case TOKEN_PUNCTUATOR:
+//            if(parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
+//            {
+//               /* compound statement... */
+//            }
+//            else
+//            {
+//                /* error: */
+//            }
+//        break;
+//    }
 }
 
-void parse_compound_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+void parse_compound_statement(struct parser_t *parser)
 {
     push_scope(parser);
 
@@ -1442,34 +1435,168 @@ void parse_compound_statement(struct parser_t *parser, struct bytecode_buffer_t 
 }
 
 
-void parse_selection_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+void parse_selection_statement(struct parser_t *parser)
 {
 
 }
 
-void parse_expression_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+void parse_iteration_statement(struct parser_t *parser)
 {
 
 }
 
-void parse_iteration_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+void parse_jump_statement(struct parser_t *parser)
 {
 
 }
 
-void parse_jump_statement(struct parser_t *parser, struct bytecode_buffer_t *bytecode_buffer)
+void parse_expression_statement(struct parser_t *parser)
 {
+    struct base_exp_node_t *expression;
+    expression = exp(parser);
+    translate_expression(expression);
+}
 
+void translate_expression(struct base_exp_node_t *exp)
+{
+    struct primary_exp_node_t *primary_exp;
+    struct postfix_exp_node_t *postfix_exp;
+    struct unary_exp_node_t *unary_exp;
+    struct multiplicative_exp_node_t *multiplicative_exp;
+    struct additive_exp_node_t *additive_exp;
+    while(exp)
+    {
+        switch(exp->type)
+        {
+            case EXP_NODE_TYPE_PRIMARY:
+                primary_exp = (struct primary_exp_node_t *)exp;
+                switch(primary_exp->type)
+                {
+                    case PRIMARY_EXP_NODE_TYPE_IDENTIFIER:
+                        printf("identifier: %s\n", primary_exp->constant.string_constant);
+                    break;
+
+                    case PRIMARY_EXP_NODE_TYPE_STRING_LITERAL:
+                        printf("string literal: %s\n", primary_exp->constant.string_constant);
+                    break;
+
+                    case PRIMARY_EXP_NODE_TYPE_INTEGER_CONSTANT:
+                        printf("integer constant: %d\n", primary_exp->constant.int_constant);
+                    break;
+                }
+            break;
+
+            case EXP_NODE_TYPE_POSTFIX:
+                postfix_exp = (struct postfix_exp_node_t *)exp;
+                switch(postfix_exp->type)
+                {
+                    case POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX:
+                        printf("array index\n");
+                    break;
+
+                    case POSTFIX_EXP_NODE_TYPE_FUNC_CALL:
+                        printf("function call\n");
+                    break;
+
+                    case POSTFIX_EXP_NODE_TYPE_INCREMENT:
+                        printf("postfix increment\n");
+                    break;
+
+                    case POSTFIX_EXP_NODE_TYPE_DECREMENT:
+                        printf("postfix decrement\n");
+                    break;
+                }
+            break;
+
+            case EXP_NODE_TYPE_UNARY:
+                unary_exp = (struct unary_exp_node_t *)exp;
+                switch(unary_exp->type)
+                {
+                    case UNARY_EXP_NODE_TYPE_INCREMENT:
+                        printf("prefix increment\n");
+                    break;
+
+                    case UNARY_EXP_NODE_TYPE_DECREMENT:
+                        printf("prefix decrement\n");
+                    break;
+
+                    case UNARY_EXP_NODE_TYPE_ADDRESS_OF:
+                        printf("address of\n");
+                    break;
+
+                    case UNARY_EXP_NODE_TYPE_DEREFERENCE:
+                        printf("dereference\n");
+                    break;
+
+                    case UNARY_EXP_NODE_TYPE_PLUS:
+                        printf("unary plus\n");
+                    break;
+
+                    case UNARY_EXP_NODE_TYPE_MINUS:
+                        printf("unary minus\n");
+                    break;
+
+                    case UNARY_EXP_NODE_TYPE_BITWISE_NOT:
+                        printf("bitwise not\n");
+                    break;
+
+                    case UNARY_EXP_NODE_TYPE_LOGICAL_NOT:
+                        printf("logical not\n");
+                    break;
+
+                    case UNARY_EXP_NODE_TYPE_SIZEOF:
+                        printf("sizeof\n");
+                    break;
+                }
+            break;
+
+            case EXP_NODE_TYPE_MULTIPLICATIVE:
+                multiplicative_exp = (struct multiplicative_exp_node_t *)exp;
+                switch(multiplicative_exp->type)
+                {
+                    case MULTIPLICATIVE_EXP_NODE_TYPE_MULT:
+                        printf("times\n");
+                    break;
+
+                    case MULTIPLICATIVE_EXP_NODE_TYPE_DIV:
+                        printf("division\n");
+                    break;
+
+                    case MULTIPLICATIVE_EXP_NODE_TYPE_MOD:
+                        printf("modulo\n");
+                    break;
+                }
+            break;
+
+            case EXP_NODE_TYPE_ADDITIVE:
+                additive_exp = (struct additive_exp_node_t *)exp;
+                switch(additive_exp->type)
+                {
+                    case ADDITIVE_EXP_NODE_TYPE_ADD:
+                        printf("plus\n");
+                    break;
+
+                    case ADDITIVE_EXP_NODE_TYPE_SUB:
+                        printf("minus\n");
+                    break;
+                }
+            break;
+
+
+        }
+
+        exp = exp->next;
+    }
 }
 
 
 
 
-void translate_type(struct reference_type_t *type, int single_reference)
+void translate_type(struct link_type_t *type, int single_reference)
 {
     struct identifier_type_t *identifier;
     struct function_type_t *function;
-    struct reference_type_t *param_or_field;
+    struct link_type_t *param_or_field;
     struct base_type_t *base_type;
     struct aggretage_type_t *aggretage_type;
 
@@ -1501,7 +1628,7 @@ void translate_type(struct reference_type_t *type, int single_reference)
                     {
                         translate_type(param_or_field, 1);
 
-                        param_or_field = (struct reference_type_t *)param_or_field->base.next;
+                        param_or_field = (struct link_type_t *)param_or_field->base.next;
 
                         if(param_or_field)
                         {
@@ -1530,7 +1657,7 @@ void translate_type(struct reference_type_t *type, int single_reference)
                     {
                         translate_type(param_or_field, 1);
 
-                        param_or_field = (struct reference_type_t *)param_or_field->base.next;
+                        param_or_field = (struct link_type_t *)param_or_field->base.next;
 
                         if(param_or_field)
                         {
@@ -1575,10 +1702,8 @@ void translate_type(struct reference_type_t *type, int single_reference)
             base_type = base_type->next;
         }
 
-        type = single_reference ? NULL : (struct reference_type_t *)type->base.next;
+        type = single_reference ? NULL : (struct link_type_t *)type->base.next;
     }
-
-    //printf("\n");
 }
 
 

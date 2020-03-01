@@ -7,444 +7,567 @@
 
 static int tokenizer_initialized = 0;
 
-static char char_map[255] = {CHAR_UNKNOWN};
+static char char_map[255] = {
+    ['0'] = CHAR_NUMBER,
+    ['1'] = CHAR_NUMBER,
+    ['2'] = CHAR_NUMBER,
+    ['3'] = CHAR_NUMBER,
+    ['4'] = CHAR_NUMBER,
+    ['5'] = CHAR_NUMBER,
+    ['6'] = CHAR_NUMBER,
+    ['7'] = CHAR_NUMBER,
+    ['8'] = CHAR_NUMBER,
+    ['9'] = CHAR_NUMBER,
 
-static char *keywords[TOKEN_KEYWORD_UNION] = {NULL};
-//static char *punctuator[TOKEN_PUNCTUATOR_UNKNOWN] = {NULL};
+    ['a'] = CHAR_LETTER,
+    ['A'] = CHAR_LETTER,
+    ['b'] = CHAR_LETTER,
+    ['B'] = CHAR_LETTER,
+    ['c'] = CHAR_LETTER,
+    ['C'] = CHAR_LETTER,
+    ['d'] = CHAR_LETTER,
+    ['D'] = CHAR_LETTER,
+    ['e'] = CHAR_LETTER,
+    ['E'] = CHAR_LETTER,
+    ['f'] = CHAR_LETTER,
+    ['F'] = CHAR_LETTER,
+    ['g'] = CHAR_LETTER,
+    ['G'] = CHAR_LETTER,
+    ['h'] = CHAR_LETTER,
+    ['H'] = CHAR_LETTER,
+    ['i'] = CHAR_LETTER,
+    ['I'] = CHAR_LETTER,
+    ['j'] = CHAR_LETTER,
+    ['J'] = CHAR_LETTER,
+    ['k'] = CHAR_LETTER,
+    ['K'] = CHAR_LETTER,
+    ['l'] = CHAR_LETTER,
+    ['L'] = CHAR_LETTER,
+    ['m'] = CHAR_LETTER,
+    ['M'] = CHAR_LETTER,
+    ['n'] = CHAR_LETTER,
+    ['N'] = CHAR_LETTER,
+    ['o'] = CHAR_LETTER,
+    ['O'] = CHAR_LETTER,
+    ['p'] = CHAR_LETTER,
+    ['P'] = CHAR_LETTER,
+    ['q'] = CHAR_LETTER,
+    ['Q'] = CHAR_LETTER,
+    ['r'] = CHAR_LETTER,
+    ['R'] = CHAR_LETTER,
+    ['s'] = CHAR_LETTER,
+    ['S'] = CHAR_LETTER,
+    ['t'] = CHAR_LETTER,
+    ['T'] = CHAR_LETTER,
+    ['u'] = CHAR_LETTER,
+    ['U'] = CHAR_LETTER,
+    ['v'] = CHAR_LETTER,
+    ['V'] = CHAR_LETTER,
+    ['w'] = CHAR_LETTER,
+    ['W'] = CHAR_LETTER,
+    ['x'] = CHAR_LETTER,
+    ['X'] = CHAR_LETTER,
+    ['y'] = CHAR_LETTER,
+    ['Y'] = CHAR_LETTER,
+    ['z'] = CHAR_LETTER,
+    ['Z'] = CHAR_LETTER,
+    ['_'] = CHAR_LETTER,
 
-void token_init()
+    ['\0'] = CHAR_SPACE,
+    [' '] = CHAR_SPACE,
+
+    ['+'] = CHAR_PUNCTUATOR,
+    ['-'] = CHAR_PUNCTUATOR,
+    ['/'] = CHAR_PUNCTUATOR,
+    ['*'] = CHAR_PUNCTUATOR,
+    ['%'] = CHAR_PUNCTUATOR,
+    [';'] = CHAR_PUNCTUATOR,
+    [':'] = CHAR_PUNCTUATOR,
+    ['('] = CHAR_PUNCTUATOR,
+    [')'] = CHAR_PUNCTUATOR,
+    [','] = CHAR_PUNCTUATOR,
+    ['='] = CHAR_PUNCTUATOR,
+    ['!'] = CHAR_PUNCTUATOR,
+    ['~'] = CHAR_PUNCTUATOR,
+    ['{'] = CHAR_PUNCTUATOR,
+    ['}'] = CHAR_PUNCTUATOR,
+    ['['] = CHAR_PUNCTUATOR,
+    [']'] = CHAR_PUNCTUATOR,
+    ['.'] = CHAR_PUNCTUATOR,
+    ['<'] = CHAR_PUNCTUATOR,
+    ['>'] = CHAR_PUNCTUATOR,
+    ['&'] = CHAR_PUNCTUATOR,
+    ['^'] = CHAR_PUNCTUATOR,
+    ['"'] = CHAR_PUNCTUATOR,
+    ['\''] = CHAR_PUNCTUATOR,
+};
+
+static char *keywords[TOKEN_KEYWORD_UNKNOWN] = {
+    [TOKEN_KEYWORD_AUTO] = "auto",
+    [TOKEN_KEYWORD_BREAK] = "break",
+    [TOKEN_KEYWORD_CASE] = "case",
+    [TOKEN_KEYWORD_CHAR] = "char",
+    [TOKEN_KEYWORD_CONST] = "const",
+    [TOKEN_KEYWORD_CONTINUE] = "continue",
+    [TOKEN_KEYWORD_DEFAULT] = "default",
+    [TOKEN_KEYWORD_DO] = "do",
+    [TOKEN_KEYWORD_DOUBLE] = "double",
+    [TOKEN_KEYWORD_ELSE] = "else",
+    [TOKEN_KEYWORD_ENUM] = "enum",
+    [TOKEN_KEYWORD_EXTERN] = "extern",
+    [TOKEN_KEYWORD_FLOAT] = "float",
+    [TOKEN_KEYWORD_FOR] = "for",
+    [TOKEN_KEYWORD_GOTO] = "goto",
+    [TOKEN_KEYWORD_IF] = "if",
+    [TOKEN_KEYWORD_INLINE] = "inline",
+    [TOKEN_KEYWORD_INT] = "int",
+    [TOKEN_KEYWORD_LONG] = "long",
+    [TOKEN_KEYWORD_REGISTER] = "register",
+    [TOKEN_KEYWORD_RESTRICT] = "restrict",
+    [TOKEN_KEYWORD_RETURN] = "return",
+    [TOKEN_KEYWORD_SHORT] = "short",
+    [TOKEN_KEYWORD_SIGNED] = "signed",
+    [TOKEN_KEYWORD_SIZEOF] = "sizeof",
+    [TOKEN_KEYWORD_STATIC] = "static",
+    [TOKEN_KEYWORD_STRUCT] = "struct",
+    [TOKEN_KEYWORD_SWITCH] = "switch",
+    [TOKEN_KEYWORD_TYPEDEF] = "typedef",
+    [TOKEN_KEYWORD_UNION] = "union",
+    [TOKEN_KEYWORD_UNSIGNED] = "unsigned",
+    [TOKEN_KEYWORD_VOID] = "void",
+    [TOKEN_KEYWORD_VOLATILE] = "volatile",
+    [TOKEN_KEYWORD_WHILE] = "while",
+};
+
+struct token_t lex_token(char *text, uint32_t *offset)
 {
-    int i;
+    uint32_t i;
+    uint32_t j;
 
-    for(i = '0'; i <= '9'; i++)
+    struct token_t token;
+    static char token_text[8192];
+    uint32_t token_text_index = 0;
+    uint32_t token_type = TOKEN_UNKNOWN;
+    uint32_t token_name = TOKEN_UNKNOWN;
+    union constant_t constant;
+    uint32_t reserved_token_type;
+    uint32_t base;
+    uint32_t has_point = 0;
+
+    i = *offset;
+
+    _try_again:
+    switch(char_map[(uint32_t)text[i]])
     {
-        char_map[i] = CHAR_NUMBER;
+        case CHAR_NUMBER:
+            token_type = TOKEN_CONSTANT;
+            token_name = TOKEN_CONSTANT_INTEGER;
+
+            while(char_map[(uint32_t)text[i]] & (CHAR_NUMBER | CHAR_LETTER))
+            {
+                token_text[token_text_index] = text[i];
+                if(text[i] == '.')
+                {
+                    has_point++;
+                }
+                i++;
+                token_text_index++;
+            }
+
+            token_text[token_text_index] = '\0';
+            token_text_index = 0;
+            if(token_text[token_text_index] == '0' && !has_point)
+            {
+                /* hex or octal constant */
+                token_text_index++;
+
+                if(token_text[token_text_index] == 'x' ||
+                   token_text[token_text_index] == 'X')
+                {
+                    base = 16;
+                }
+                else if(token_text[token_text_index])
+                {
+                    base = 8;
+                }
+
+                constant.int_constant = strtol(token_text, NULL, base);
+            }
+            else
+            {
+                if(!has_point)
+                {
+                    /* integer constant */
+                    constant.int_constant = strtol(token_text, NULL, 10);
+                }
+                else
+                {
+                    /* maybe a float constant */
+                }
+            }
+
+        break;
+
+        case CHAR_LETTER:
+            token_type = TOKEN_IDENTIFIER;
+            token_name = TOKEN_UNKNOWN;
+
+            while(char_map[(uint32_t)text[i]] & (CHAR_LETTER | CHAR_NUMBER))
+            {
+                token_text[token_text_index] = text[i];
+                i++;
+                token_text_index++;
+            }
+
+            token_text[token_text_index] = '\0';
+
+            /* check to see whether this is a reserved keyword... */
+            for(j = TOKEN_KEYWORD_AUTO; j < TOKEN_KEYWORD_WHILE; j++)
+            {
+                if(!strcmp(keywords[j], token_text))
+                {
+                    token_type = TOKEN_KEYWORD;
+                    token_name = j;
+                    /* yup... */
+                    break;
+                }
+            }
+
+            if(token_type == TOKEN_IDENTIFIER)
+            {
+                constant.string_constant = token_text;
+            }
+
+        break;
+
+        case CHAR_PUNCTUATOR:
+            token_type = TOKEN_PUNCTUATOR;
+
+            switch(text[i])
+            {
+                case '+':
+                    i++;
+
+                    if(text[i] == '+')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_INCREMENT;
+                    }
+                    else if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_PLUS_ASSIGN;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_PLUS;
+                    }
+
+                break;
+
+                case '-':
+                    i++;
+
+                    if(text[i] == '-')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_DECREMENT;
+                    }
+                    else if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_MINUS_ASSIGN;
+                    }
+                    else if(text[i] == '>')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_ARROW;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_MINUS;
+                    }
+                break;
+
+                case '*':
+                    i++;
+
+                    if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_MUL_ASSIGN;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_ASTERISC;
+                    }
+
+                break;
+
+                case '/':
+                    i++;
+
+                    if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_DIV_ASSIGN;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_SLASH;
+                    }
+                break;
+
+                case '%':
+                    i++;
+
+                    if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_MOD_ASSIGN;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_PERCENT;
+                    }
+                break;
+
+                case '=':
+                    i++;
+
+                    if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_EQUAL;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_ASSIGN;
+                    }
+                break;
+
+                case '<':
+                    i++;
+
+                    if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_LESS_THAN_OR_EQUAL;
+                    }
+                    else if(text[i] == '<')
+                    {
+                        i++;
+
+                        if(text[i] == '=')
+                        {
+                            i++;
+                            token_name = TOKEN_PUNCTUATOR_LEFT_SHIFT_ASSIGN;
+                        }
+                        else
+                        {
+                            token_name = TOKEN_PUNCTUATOR_LEFT_SHIFT;
+                        }
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_LESS_THAN;
+                    }
+                break;
+
+                case '>':
+                    i++;
+
+                    if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_GREATER_THAN_OR_EQUAL;
+                    }
+                    else if(text[i] == '>')
+                    {
+                        i++;
+
+                        if(text[i] == '=')
+                        {
+                            i++;
+                            token_name = TOKEN_PUNCTUATOR_RIGHT_SHIFT_ASSIGN;
+                        }
+                        else
+                        {
+                            token_name = TOKEN_PUNCTUATOR_RIGHT_SHIFT;
+                        }
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_GREATER_THAN;
+                    }
+                break;
+
+                case '(':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_OPARENTHESIS;
+                break;
+
+                case ')':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_CPARENTHESIS;
+                break;
+
+                case '{':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_OBRACE;
+                break;
+
+                case '}':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_CBRACE;
+                break;
+
+                case '[':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_OBRACKET;
+                break;
+
+                case ']':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_CBRACKET;
+                break;
+
+                case ',':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_COMMA;
+                break;
+
+                case ';':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_SEMICOLON;
+                break;
+
+                case ':':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_COLON;
+                break;
+
+                case '!':
+                    i++;
+
+                    if(text[i] == '=')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_NOT_EQUAL;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_EXCLAMATION;
+                    }
+                break;
+
+                case '~':
+                    i++;
+                    token_name = TOKEN_PUNCTUATOR_TILDE;
+                break;
+
+                case '&':
+                    i++;
+
+                    if(text[i] == '&')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_LOG_AND;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_AMPERSAND;
+                    }
+
+                break;
+
+                case '|':
+                    i++;
+
+                    if(text[i] == '|')
+                    {
+                        i++;
+                        token_name = TOKEN_PUNCTUATOR_LOG_OR;
+                    }
+                    else
+                    {
+                        token_name = TOKEN_PUNCTUATOR_BW_OR;
+                    }
+                break;
+
+                case '\'':
+
+                break;
+
+                case '"':
+                    token_type = TOKEN_STRING_LITERAL;
+                    i++;
+                    while(text[i] != '"' && text[i] != '\0')
+                    {
+                        token_text[token_text_index] = text[i];
+                        token_text_index++;
+                        i++;
+                    }
+                    i++;
+                    token_text[token_text_index] = '\0';
+                    constant.string_constant = token_text;
+                break;
+            }
+        break;
+
+        case CHAR_UNKNOWN:
+            i++;
+            token_type = TOKEN_UNKNOWN;
+            token_name = TOKEN_UNKNOWN;
+        break;
+
+        case CHAR_SPACE:
+            if(text[i])
+            {
+                while(char_map[(uint32_t)text[i]] == CHAR_SPACE)
+                {
+                    i++;
+                }
+                goto _try_again;
+            }
+            else
+            {
+                token_type = TOKEN_EOF;
+            }
+        break;
     }
 
-    for(i = 'a'; i <= 'z'; i++)
-    {
-        char_map[i] = CHAR_LETTER;
-    }
+    token.constant = constant;
+    token.token_type = token_type;
+    token.token_name = token_name;
+    *offset = i;
 
-    for(i = 'A'; i <= 'Z'; i++)
-    {
-        char_map[i] = CHAR_LETTER;
-    }
-
-    char_map['_'] = CHAR_LETTER;
-
-    char_map['+'] = CHAR_PUNCTUATOR;
-    char_map['-'] = CHAR_PUNCTUATOR;
-    char_map['/'] = CHAR_PUNCTUATOR;
-    char_map['*'] = CHAR_PUNCTUATOR;
-    char_map['%'] = CHAR_PUNCTUATOR;
-    char_map[';'] = CHAR_PUNCTUATOR;
-    char_map[':'] = CHAR_PUNCTUATOR;
-    char_map['('] = CHAR_PUNCTUATOR;
-    char_map[')'] = CHAR_PUNCTUATOR;
-    char_map[' '] = CHAR_SPACE;
-    char_map[','] = CHAR_PUNCTUATOR;
-    char_map['='] = CHAR_PUNCTUATOR;
-    char_map['!'] = CHAR_PUNCTUATOR;
-    char_map['~'] = CHAR_PUNCTUATOR;
-    char_map['{'] = CHAR_PUNCTUATOR;
-    char_map['}'] = CHAR_PUNCTUATOR;
-    char_map['['] = CHAR_PUNCTUATOR;
-    char_map[']'] = CHAR_PUNCTUATOR;
-    char_map['.'] = CHAR_PUNCTUATOR;
-    char_map['<'] = CHAR_PUNCTUATOR;
-    char_map['>'] = CHAR_PUNCTUATOR;
-    char_map['&'] = CHAR_PUNCTUATOR;
-    char_map['^'] = CHAR_PUNCTUATOR;
-
-    keywords[TOKEN_KEYWORD_AUTO] = "auto";
-    keywords[TOKEN_KEYWORD_BREAK] = "break";
-    keywords[TOKEN_KEYWORD_CASE] = "case";
-    keywords[TOKEN_KEYWORD_CHAR] = "char";
-    keywords[TOKEN_KEYWORD_CONST] = "const";
-    keywords[TOKEN_KEYWORD_CONTINUE] = "continue";
-    keywords[TOKEN_KEYWORD_DEFAULT] = "default";
-    keywords[TOKEN_KEYWORD_DO] = "do";
-    keywords[TOKEN_KEYWORD_DOUBLE] = "double";
-    keywords[TOKEN_KEYWORD_ELSE] = "else";
-    keywords[TOKEN_KEYWORD_ENUM] = "enum";
-    keywords[TOKEN_KEYWORD_EXTERN] = "extern";
-    keywords[TOKEN_KEYWORD_FLOAT] = "float";
-    keywords[TOKEN_KEYWORD_FOR] = "for";
-    keywords[TOKEN_KEYWORD_GOTO] = "goto";
-    keywords[TOKEN_KEYWORD_IF] = "if";
-    keywords[TOKEN_KEYWORD_INLINE] = "inline";
-    keywords[TOKEN_KEYWORD_INT] = "int";
-    keywords[TOKEN_KEYWORD_LONG] = "long";
-    keywords[TOKEN_KEYWORD_REGISTER] = "register";
-    keywords[TOKEN_KEYWORD_RESTRICT] = "restrict";
-    keywords[TOKEN_KEYWORD_RETURN] = "return";
-    keywords[TOKEN_KEYWORD_SHORT] = "short";
-    keywords[TOKEN_KEYWORD_SIGNED] = "signed";
-    keywords[TOKEN_KEYWORD_SIZEOF] = "sizeof";
-    keywords[TOKEN_KEYWORD_STATIC] = "static";
-    keywords[TOKEN_KEYWORD_STRUCT] = "struct";
-    keywords[TOKEN_KEYWORD_SWITCH] = "switch";
-    keywords[TOKEN_KEYWORD_TYPEDEF] = "typedef";
-    keywords[TOKEN_KEYWORD_UNION] = "union";
-    keywords[TOKEN_KEYWORD_UNSIGNED] = "unsigned";
-    keywords[TOKEN_KEYWORD_VOID] = "void";
-    keywords[TOKEN_KEYWORD_VOLATILE] = "volatile";
-    keywords[TOKEN_KEYWORD_WHILE] = "while";
-
-    tokenizer_initialized = 1;
+    return token;
 }
 
-struct token_t *tokenize(char *text)
+struct token_t *lex_tokens(char *text)
 {
-    int i;
-    int j;
+    uint32_t i = 0;
 
     struct token_t *tokens = NULL;
     struct token_t *last_token = NULL;
     struct token_t *new_token = NULL;
-
-    char token_text[512];
-    int token_text_index;
-    int token_type;
-    int token_name;
-    int reserved_token_type;
-
-    if(!tokenizer_initialized)
-    {
-        token_init();
-    }
-
-    i = 0;
+    struct token_t token;
 
     while(text[i])
     {
-        //int char_type = char_map[(int)text[i]];
-
-        token_text[0] = '\0';
-        token_text_index = 0;
-        switch(char_map[(int)text[i]])
+        token = lex_token(text, &i);
+        if(token.token_type == TOKEN_UNKNOWN)
         {
-            case CHAR_NUMBER:
-                token_type = TOKEN_CONSTANT;
-                token_name = TOKEN_UNKNOWN;
-
-                while(char_map[(int)text[i]] & CHAR_NUMBER)
-                {
-                    token_text[token_text_index] = text[i];
-                    i++;
-                    token_text_index++;
-                }
-
-                token_text[token_text_index] = '\0';
-
-            break;
-
-            case CHAR_LETTER:
-                token_type = TOKEN_IDENTIFIER;
-                token_name = TOKEN_UNKNOWN;
-
-                while(char_map[(int)text[i]] & (CHAR_LETTER | CHAR_NUMBER))
-                {
-                    token_text[token_text_index] = text[i];
-                    i++;
-                    token_text_index++;
-                }
-
-                token_text[token_text_index] = '\0';
-
-                /* check to see whether this is a reserved keyword... */
-                for(j = TOKEN_KEYWORD_AUTO; j < TOKEN_KEYWORD_WHILE; j++)
-                {
-                    if(!strcmp(keywords[j], token_text))
-                    {
-                        token_type = TOKEN_KEYWORD;
-                        token_name = j;
-                        /* yup... */
-                        break;
-                    }
-                }
-
-            break;
-
-            case CHAR_PUNCTUATOR:
-                token_type = TOKEN_PUNCTUATOR;
-
-                switch(text[i])
-                {
-                    case '+':
-                        i++;
-
-                        if(text[i] == '+')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_INCREMENT;
-                        }
-                        else if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_PLUS_ASSIGN;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_PLUS;
-                        }
-
-                    break;
-
-                    case '-':
-                        i++;
-
-                        if(text[i] == '-')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_DECREMENT;
-                        }
-                        else if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_MINUS_ASSIGN;
-                        }
-                        else if(text[i] == '>')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_ARROW;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_MINUS;
-                        }
-                    break;
-
-                    case '*':
-                        i++;
-
-                        if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_MUL_ASSIGN;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_ASTERISC;
-                        }
-
-                    break;
-
-                    case '/':
-                        i++;
-
-                        if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_DIV_ASSIGN;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_SLASH;
-                        }
-                    break;
-
-                    case '%':
-                        i++;
-
-                        if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_MOD_ASSIGN;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_PERCENT;
-                        }
-                    break;
-
-                    case '=':
-                        i++;
-
-                        if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_EQUAL;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_ASSIGN;
-                        }
-                    break;
-
-                    case '<':
-                        i++;
-
-                        if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_LESS_THAN_OR_EQUAL;
-                        }
-                        else if(text[i] == '<')
-                        {
-                            i++;
-
-                            if(text[i] == '=')
-                            {
-                                i++;
-                                token_name = TOKEN_PUNCTUATOR_LEFT_SHIFT_ASSIGN;
-                            }
-                            else
-                            {
-                                token_name = TOKEN_PUNCTUATOR_LEFT_SHIFT;
-                            }
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_LESS_THAN;
-                        }
-                    break;
-
-                    case '>':
-                        i++;
-
-                        if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_GREATER_THAN_OR_EQUAL;
-                        }
-                        else if(text[i] == '>')
-                        {
-                            i++;
-
-                            if(text[i] == '=')
-                            {
-                                i++;
-                                token_name = TOKEN_PUNCTUATOR_RIGHT_SHIFT_ASSIGN;
-                            }
-                            else
-                            {
-                                token_name = TOKEN_PUNCTUATOR_RIGHT_SHIFT;
-                            }
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_GREATER_THAN;
-                        }
-                    break;
-
-                    case '(':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_OPARENTHESIS;
-                    break;
-
-                    case ')':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_CPARENTHESIS;
-                    break;
-
-                    case '{':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_OBRACE;
-                    break;
-
-                    case '}':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_CBRACE;
-                    break;
-
-                    case '[':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_OBRACKET;
-                    break;
-
-                    case ']':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_CBRACKET;
-                    break;
-
-                    case ',':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_COMMA;
-                    break;
-
-                    case ';':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_SEMICOLON;
-                    break;
-
-                    case ':':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_COLON;
-                    break;
-
-                    case '!':
-                        i++;
-
-                        if(text[i] == '=')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_NOT_EQUAL;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_EXCLAMATION;
-                        }
-                    break;
-
-                    case '~':
-                        i++;
-                        token_name = TOKEN_PUNCTUATOR_TILDE;
-                    break;
-
-                    case '&':
-                        i++;
-
-                        if(text[i] == '&')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_LOG_AND;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_AMPERSAND;
-                        }
-
-                    break;
-
-                    case '|':
-                        i++;
-
-                        if(text[i] == '|')
-                        {
-                            i++;
-                            token_name = TOKEN_PUNCTUATOR_LOG_OR;
-                        }
-                        else
-                        {
-                            token_name = TOKEN_PUNCTUATOR_BW_OR;
-                        }
-                    break;
-                }
-            break;
-
-            case CHAR_UNKNOWN:
-                i++;
-                token_type = TOKEN_UNKNOWN;
-                token_name = TOKEN_UNKNOWN;
-            break;
-
-            case CHAR_SPACE:
-
-                while(char_map[(int)text[i]] == CHAR_SPACE)
-                {
-                    i++;
-                }
-
-                continue;
-            break;
+            continue;
         }
-
         new_token = calloc(sizeof(struct token_t), 1);
-        strcpy(new_token->text, token_text);
-        new_token->token_type = token_type;
-        new_token->token_name = token_name;
+        memcpy(new_token, &token, sizeof(struct token_t));
+        if(new_token->token_type == TOKEN_IDENTIFIER ||
+           new_token->token_type == TOKEN_STRING_LITERAL)
+        {
+            new_token->constant.string_constant = strdup(token.constant.string_constant);
+        }
 
         if(!tokens)
         {
@@ -482,9 +605,10 @@ void free_tokens(struct token_t *tokens)
 
     while(tokens)
     {
-        if(tokens->text)
+        if(tokens->token_type == TOKEN_STRING_LITERAL ||
+            tokens->token_type == TOKEN_IDENTIFIER);
         {
-            free(tokens->text);
+            free(tokens->constant.string_constant);
         }
 
         next_token = tokens->next;
@@ -503,11 +627,15 @@ void translate_token(struct token_t *token)
         break;
 
         case TOKEN_CONSTANT:
-            printf("TOKEN_CONSTANT: %s\n", token->text);
+//            printf("TOKEN_CONSTANT: %s\n", token->text);
+        break;
+
+        case TOKEN_STRING_LITERAL:
+            printf("TOKEN_STRING_LITERAL: %s\n", token->constant.string_constant);
         break;
 
         case TOKEN_IDENTIFIER:
-            printf("TOKEN_IDENTIFIER: %s\n", token->text);
+            printf("TOKEN_IDENTIFIER: %s\n", token->constant.string_constant);
         break;
 
         case TOKEN_KEYWORD:

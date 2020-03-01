@@ -1,5 +1,6 @@
 #include "bc.h"
-
+#include <stdlib.h>
+#include <string.h>
 
 
 void emit_bytecode(struct bytecode_buffer_t *buffer, unsigned char instruction, unsigned char dst, unsigned char src, unsigned int param)

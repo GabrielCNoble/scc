@@ -1,10 +1,11 @@
 #include "tok.h"
-#include "exp.h"
-#include "stm.h"
+//#include "exp.h"
+//#include "stm.h"
 #include "parse.h"
 
 #include <stdio.h>
 #include <string.h>
+
 
 
 int main()
@@ -12,6 +13,8 @@ int main()
     char exp[1024];
     int exp_len;
     struct token_t *tokens;
+
+    int short a;
 
     while(1)
     {
@@ -27,10 +30,12 @@ int main()
 
         exp[exp_len - 1] = '\0';
 
-        tokens = tokenize(exp);
+        parse(exp);
+
+//        tokens = tokenize(exp);
 
 
-        parse_tokens(tokens);
+//        parse_tokens(tokens);
         //token = tokens;
 
         //ast = exp_16(&token);
