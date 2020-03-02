@@ -5,8 +5,6 @@
 #include <stdio.h>
 
 
-static int tokenizer_initialized = 0;
-
 static char char_map[255] = {
     ['0'] = CHAR_NUMBER,
     ['1'] = CHAR_NUMBER,

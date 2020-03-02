@@ -1,5 +1,9 @@
 #include "parse.h"
 #include "type.h"
+#include "tok.h"
+#include "scope.h"
+#include "obj.h"
+#include "exp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -197,137 +201,6 @@ void advance_token(struct parser_t *parser)
     }
 
     parser->next_token = parser->current_token->next;
-}
-
-/*
-==========================================================================================
-==========================================================================================
-==========================================================================================
-*/
-
-struct scope_t *push_scope(struct parser_t *parser)
-{
-    struct scope_t *scope;
-
-    scope = calloc(sizeof(struct scope_t ), 1);
-
-    scope->parent = parser->current_scope;
-    parser->current_scope = scope;
-
-    parser->scope_stack_top++;
-    parser->scope_stack[parser->scope_stack_top] = scope;
-
-
-    return scope;
-}
-
-struct scope_t *pop_scope(struct parser_t *parser)
-{
-    struct scope_t *scope = NULL;
-
-    if(parser->scope_stack_top > 0)
-    {
-        scope = parser->current_scope;
-
-        if(!scope->objects)
-        {
-            /* only get rid of a scope when leaving it if no
-            object lives in it...*/
-            free(scope);
-        }
-
-        parser->scope_stack_top--;
-
-        parser->current_scope = parser->scope_stack[parser->scope_stack_top];
-    }
-
-    return parser->current_scope;
-}
-
-/*
-==========================================================================================
-==========================================================================================
-==========================================================================================
-*/
-
-struct object_t *create_object(struct parser_t *parser, struct base_type_t *type)
-{
-    struct object_t *object;
-    struct identifier_type_t *object_type;
-
-    if(type->type == TYPE_LINK)
-    {
-        type = ((struct link_type_t *)type)->type;
-    }
-
-    assert(type->type == TYPE_IDENTIFIER);
-
-    object_type = (struct identifier_type_t *)type;
-
-    object = calloc(sizeof(struct object_t), 1);
-    object->type = object_type->base.next;
-    object->scope = parser->current_scope;
-    object->id = strdup(object_type->identifier);
-
-    if(!parser->current_scope->objects)
-    {
-        parser->current_scope->objects = object;
-    }
-    else
-    {
-        parser->current_scope->last_object->next = object;
-    }
-
-    parser->current_scope->last_object = object;
-
-    return object;
-}
-
-struct object_t *get_object(struct parser_t *parser, char *id)
-{
-    struct object_t *object;
-//    struct scope_t *scope;
-    int i;
-
-    for(i = parser->scope_stack_top; i >= 0; i--)
-    {
-        /* start by testing the innermost scopes, as
-        objects can have the same identifier if they get
-        declared in different scopes, and objects in
-        inner scopes shadow objects in outer scopes...*/
-        object = parser->scope_stack[i]->objects;
-
-        while(object)
-        {
-            if(!strcmp(id, object->id))
-            {
-                return object;
-            }
-
-            object = object->next;
-        }
-    }
-
-    return NULL;
-}
-
-int is_object_in_scope(struct parser_t *parser, struct object_t *object)
-{
-    int i;
-
-    for(i = parser->scope_stack_top; i >= 0; i--)
-    {
-        if(parser->scope_stack[i] == object->scope)
-        {
-            /* if the scope in which the object exists
-            is in the scope stack, the object will be in
-            scope... */
-            break;
-        }
-    }
-
-    /* null here means the object is out of scope... */
-    return i >= 0;
 }
 
 /*
@@ -542,9 +415,6 @@ void parse_tokens(struct token_t *tokens)
 void parse(char *text)
 {
     struct parser_t parser = {};
-
-    parser.scope_stack_top = -1;
-    parser.scope_stack = calloc(sizeof(struct scope_t *), SCOPE_MAX_DEPTH);
     parser.tokens = lex_tokens(text);
     advance_token(&parser);
     push_scope(&parser);
@@ -1452,145 +1322,12 @@ void parse_jump_statement(struct parser_t *parser)
 
 void parse_expression_statement(struct parser_t *parser)
 {
-    struct base_exp_node_t *expression;
-    expression = exp(parser);
-    translate_expression(expression);
+    struct base_exp_node_t *exp;
+    exp = parse_exp(parser);
+    traverse_exp_tree(exp);
+    printf("\n");
+//    translate_expression(expression);
 }
-
-void translate_expression(struct base_exp_node_t *exp)
-{
-    struct primary_exp_node_t *primary_exp;
-    struct postfix_exp_node_t *postfix_exp;
-    struct unary_exp_node_t *unary_exp;
-    struct multiplicative_exp_node_t *multiplicative_exp;
-    struct additive_exp_node_t *additive_exp;
-    while(exp)
-    {
-        switch(exp->type)
-        {
-            case EXP_NODE_TYPE_PRIMARY:
-                primary_exp = (struct primary_exp_node_t *)exp;
-                switch(primary_exp->type)
-                {
-                    case PRIMARY_EXP_NODE_TYPE_IDENTIFIER:
-                        printf("identifier: %s\n", primary_exp->constant.string_constant);
-                    break;
-
-                    case PRIMARY_EXP_NODE_TYPE_STRING_LITERAL:
-                        printf("string literal: %s\n", primary_exp->constant.string_constant);
-                    break;
-
-                    case PRIMARY_EXP_NODE_TYPE_INTEGER_CONSTANT:
-                        printf("integer constant: %d\n", primary_exp->constant.int_constant);
-                    break;
-                }
-            break;
-
-            case EXP_NODE_TYPE_POSTFIX:
-                postfix_exp = (struct postfix_exp_node_t *)exp;
-                switch(postfix_exp->type)
-                {
-                    case POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX:
-                        printf("array index\n");
-                    break;
-
-                    case POSTFIX_EXP_NODE_TYPE_FUNC_CALL:
-                        printf("function call\n");
-                    break;
-
-                    case POSTFIX_EXP_NODE_TYPE_INCREMENT:
-                        printf("postfix increment\n");
-                    break;
-
-                    case POSTFIX_EXP_NODE_TYPE_DECREMENT:
-                        printf("postfix decrement\n");
-                    break;
-                }
-            break;
-
-            case EXP_NODE_TYPE_UNARY:
-                unary_exp = (struct unary_exp_node_t *)exp;
-                switch(unary_exp->type)
-                {
-                    case UNARY_EXP_NODE_TYPE_INCREMENT:
-                        printf("prefix increment\n");
-                    break;
-
-                    case UNARY_EXP_NODE_TYPE_DECREMENT:
-                        printf("prefix decrement\n");
-                    break;
-
-                    case UNARY_EXP_NODE_TYPE_ADDRESS_OF:
-                        printf("address of\n");
-                    break;
-
-                    case UNARY_EXP_NODE_TYPE_DEREFERENCE:
-                        printf("dereference\n");
-                    break;
-
-                    case UNARY_EXP_NODE_TYPE_PLUS:
-                        printf("unary plus\n");
-                    break;
-
-                    case UNARY_EXP_NODE_TYPE_MINUS:
-                        printf("unary minus\n");
-                    break;
-
-                    case UNARY_EXP_NODE_TYPE_BITWISE_NOT:
-                        printf("bitwise not\n");
-                    break;
-
-                    case UNARY_EXP_NODE_TYPE_LOGICAL_NOT:
-                        printf("logical not\n");
-                    break;
-
-                    case UNARY_EXP_NODE_TYPE_SIZEOF:
-                        printf("sizeof\n");
-                    break;
-                }
-            break;
-
-            case EXP_NODE_TYPE_MULTIPLICATIVE:
-                multiplicative_exp = (struct multiplicative_exp_node_t *)exp;
-                switch(multiplicative_exp->type)
-                {
-                    case MULTIPLICATIVE_EXP_NODE_TYPE_MULT:
-                        printf("times\n");
-                    break;
-
-                    case MULTIPLICATIVE_EXP_NODE_TYPE_DIV:
-                        printf("division\n");
-                    break;
-
-                    case MULTIPLICATIVE_EXP_NODE_TYPE_MOD:
-                        printf("modulo\n");
-                    break;
-                }
-            break;
-
-            case EXP_NODE_TYPE_ADDITIVE:
-                additive_exp = (struct additive_exp_node_t *)exp;
-                switch(additive_exp->type)
-                {
-                    case ADDITIVE_EXP_NODE_TYPE_ADD:
-                        printf("plus\n");
-                    break;
-
-                    case ADDITIVE_EXP_NODE_TYPE_SUB:
-                        printf("minus\n");
-                    break;
-                }
-            break;
-
-
-        }
-
-        exp = exp->next;
-    }
-}
-
-
-
 
 void translate_type(struct link_type_t *type, int single_reference)
 {

@@ -1,39 +1,17 @@
 #ifndef OBJ_H
 #define OBJ_H
 
+#include "common.h"
 
 
-#include "type.h"
-#include "scope.h"
+struct object_t *create_object(struct parser_t *parser, struct base_type_t *type);
 
-enum STORAGE_CLASS
-{
-    STORAGE_CLASS_AUTO = 0,         /* default... */
-    STORAGE_CLASS_EXTERN,
-    STORAGE_CLASS_STATIC,
-};
+struct object_t *get_object(struct parser_t *parser, char *id);
 
-struct object_t
-{
-    struct object_t *next;
-    struct scope_t *scope;
-    struct base_type_t *type;
-    char *id;
-    int storage_class;
-    unsigned int offset;            /* offset from the segment pointer... */
-};
+int is_object_in_scope(struct parser_t *parser, struct object_t *object);
 
-struct function_t
-{
-    struct object_t *object;
-};
 
-struct scope_t
-{
-    struct scope_t *parent;
 
-    struct object_t *objects;
-    struct object_t *last_object;
-};
+
 
 #endif // OBJ_H

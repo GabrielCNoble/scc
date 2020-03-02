@@ -2,66 +2,24 @@
 #define PARSE_H
 
 
-#include <stdint.h>
-#include "tok.h"
-#include "type.h"
-#include "scope.h"
-#include "obj.h"
-#include "exp.h"
+//#include <stdint.h>
+#include "common.h"
+//#include "type.h"
+//#include "scope.h"
+//#include "obj.h"
+//#include "exp.h"
 //#include "bc.h"
 
 
 
 
-enum PARSER_STATE
-{
-    PARSER_STATE_NONE = 0,
-    PARSER_STATE_DECL = 1,
-    PARSER_STATE_PARAM_LIST = 1 << 1,
-};
+//enum PARSER_STATE
+//{
+//    PARSER_STATE_NONE = 0,
+//    PARSER_STATE_DECL = 1,
+//    PARSER_STATE_PARAM_LIST = 1 << 1,
+//};
 
-
-struct parser_t
-{
-    struct token_t *tokens;
-    struct token_t *current_token;
-    struct token_t *next_token;
-//    struct token_t *prev_token;
-
-    /* two string buffers, one for the current token,
-    one for the look ahead */
-//    char *text_buffers[2];
-//    uint32_t current_text_buffer;
-//    struct token_t current_token;
-//    struct token_t next_token;
-
-//    uint32_t offset;
-//    char *source;
-
-
-    int declaration_depth;
-
-    int param_list_level;
-    int aggregate_level;
-
-    struct aggretage_type_t *aggregate_types;
-    struct base_type_t *typedef_types;
-
-    int scope_stack_top;
-    struct scope_t **scope_stack;
-    struct scope_t *current_scope;
-
-//    unsigned int reg_index;
-};
-
-
-enum DECL_TOKENS
-{
-    DECL_TOKEN_QUALIFIER = 0,
-    DECL_TOKEN_SPECIFIER,
-    DECL_TOKEN_STORAGE_CLASS,
-    DECL_TOKEN_DECLARATOR,
-};
 
 
 int is_type_specifier(struct token_t *token);
@@ -80,27 +38,6 @@ char *type_string(struct base_type_t *type);
 
 void advance_token(struct parser_t *parser);
 
-/*
-==========================================================================================
-==========================================================================================
-==========================================================================================
-*/
-
-struct scope_t *push_scope(struct parser_t *parser);
-
-struct scope_t *pop_scope(struct parser_t *parser);
-
-/*
-==========================================================================================
-==========================================================================================
-==========================================================================================
-*/
-
-struct object_t *create_object(struct parser_t *parser, struct base_type_t *type);
-
-struct object_t *get_object(struct parser_t *parser, char *id);
-
-int is_object_in_scope(struct parser_t *parser, struct object_t *object);
 
 /*
 ==========================================================================================
