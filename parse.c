@@ -419,7 +419,9 @@ void parse(char *text)
     advance_token(&parser);
     push_scope(&parser);
 
-    parse_expression_statement(&parser);
+    parse_statement(&parser);
+
+    // parse_expression_statement(&parser);
 //    while(parser.current_token->token_type != TOKEN_EOF)
 //    {
 //
@@ -1204,6 +1206,50 @@ struct base_type_t *parse_aggregate_declaration(struct parser_t *parser)
 void parse_statement(struct parser_t *parser)
 {
     struct token_t *token;
+
+    switch(parser->current_token->token_type)
+    {
+        case TOKEN_IDENTIFIER:
+        {
+            /* label */
+            advance_token(parser);
+            if(parser->current_token->token_type == TOKEN_PUNCTUATOR && parser->current_token->token_name == TOKEN_PUNCTUATOR_COLON)
+            {
+                /* create label */
+                advance_token(parser);
+                parse_statement(parser);
+            }
+        }
+        break;
+
+        case TOKEN_KEYWORD:
+        {
+            switch(parser->current_token->token_name)
+            {
+                case TOKEN_KEYWORD_CASE:
+                    advance_token(parser);
+                    if(parser->current_token->token_type == TOKEN_CONSTANT)
+                    {
+                        advance_token(parser);
+
+                        if(parser->current_token->token_type == TOKEN_PUNCTUATOR && parser->current_token->token_name == TOKEN_PUNCTUATOR_COLON)
+                        {
+                            advance_token(parser);
+                            /* create case */
+                            parse_statement(parser);
+                        }
+                    }
+                break;
+
+                case TOKEN_KEYWORD_DEFAULT:
+                {
+                    
+                }
+                break;
+            }
+        }
+        break;
+    }
 
 //    switch(parser->current_token->token_type)
 //    {

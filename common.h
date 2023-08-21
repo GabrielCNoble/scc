@@ -134,13 +134,13 @@ union constant_t
 
 struct token_t
 {
-    struct token_t *next;
-    union constant_t constant;
-    int token_type;
-    int token_name;
+    struct token_t *    next;
+    union constant_t    constant;
+    uint32_t            type;
+    uint32_t            name;
 
-    unsigned int line;
-    unsigned int column;
+    uint32_t            line;
+    uint32_t            column;
 //    int token;
 //    int reserved_token;
 };
@@ -390,6 +390,44 @@ struct object_t
 struct function_t
 {
     struct object_t *object;
+};
+
+/*
+************************************************************
+************************************************************
+************************************************************
+*/
+
+struct base_statement_t
+{
+    struct base_statement_t *next;
+    uint32_t type;
+};
+
+struct block_statement_t
+{
+    struct base_statement_t base;
+    struct base_exp_node_t *exps;
+};
+
+struct if_statement_t
+{
+    struct base_statement_t base;
+    struct base_exp_node_t *condition;
+};
+
+struct for_statement_t
+{
+    struct base_statement_t base;
+    struct base_exp_node_t *first_init_exp;
+    struct base_exp_node_t *middle_init_exp;
+    struct base_exp_node_t *last_init_exp;
+};
+
+struct switch_statement_t
+{
+    struct base_statement_t base;
+    struct base_exp_node_t *switch_exp;
 };
 
 /*
