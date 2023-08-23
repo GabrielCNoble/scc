@@ -579,6 +579,7 @@ struct parser_t
 //    int scope_stack_top;
 //    struct scope_t **scope_stack;
     struct scope_t *            current_scope;
+    struct declarator_t *       cur_function;
 };
 
 #endif // COMMON_H

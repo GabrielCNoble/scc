@@ -399,8 +399,10 @@ struct base_exp_node_t *primary_exp(struct parser_t *parser)
                 {
                     node = (struct primary_exp_node_t *)new_node(EXP_NODE_TYPE_PRIMARY);
                     node->type = PRIMARY_EXP_NODE_TYPE_EXPRESSION;
+                    /* (... */
                     advance_token(parser);
                     node->base.left = comma_exp(parser);
+                    /* ...) */
                     advance_token(parser);
                 }
             break;

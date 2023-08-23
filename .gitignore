@@ -3,4 +3,5 @@
 *.depend
 *.exe
 *.layout 
+*.out
 .vscode

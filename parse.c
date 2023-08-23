@@ -614,6 +614,10 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_
 
             declarator_type->next = type;
         }
+        else
+        {
+            declarator->type = type;
+        }
 
         if(declarators == NULL)
         {
@@ -1317,28 +1321,28 @@ void parse_statement(struct parser_t *parser)
     {
         parse_compound_statement(parser);
     }
-    else if(parser->cur_token->type == TOKEN_IDENTIFIER)
+    else if(parser->cur_token->type == TOKEN_IDENTIFIER && parser->next_token->type == TOKEN_PUNCTUATOR && 
+            parser->next_token->type == TOKEN_PUNCTUATOR_COLON)
     {
-        if(parser->next_token->type == TOKEN_PUNCTUATOR && parser->next_token->type == TOKEN_PUNCTUATOR_COLON)
-        {
-            parse_labeled_statement(parser);
-        }
+        parse_labeled_statement(parser);
     }
     else if(parser->cur_token->type == TOKEN_KEYWORD)
     {
-        if(parser->cur_token->name == TOKEN_KEYWORD_CASE || parser->cur_token->name == TOKEN_KEYWORD_DEFAULT)
-        {
-            parse_labeled_statement(parser);
-        }
-    }
-    else if(parser->cur_token->type == TOKEN_PUNCTUATOR)
-    {
         switch(parser->cur_token->name)
         {
-            case TOKEN_PUNCTUATOR_OBRACE:
-                parse_compound_statement(parser);
+            case TOKEN_KEYWORD_CASE:
+            case TOKEN_KEYWORD_DEFAULT:
+                parse_labeled_statement(parser);
             break;
         }
+    }
+    else if(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_OBRACE)
+    {
+        parse_compound_statement(parser);
+    }
+    else
+    {
+        parse_expression_statement(parser);
     }
 }
 
@@ -1413,9 +1417,20 @@ void parse_compound_statement(struct parser_t *parser)
         {
             struct declarator_t *declarator = parse_declaration(parser, 0);
 
-            if(declarator->type->type == TYPE_FUNCTION)
+            if(declarator->type->type == TYPE_FUNCTION && parser->current_scope->parent != NULL)
             {
+                error(parser->cur_token->line, parser->cur_token->column, "Functions may be declared only in file scope");
 
+                if(!declarator->type->func.prototype)
+                {
+                    if(parser->cur_token->type != TOKEN_PUNCTUATOR || parser->cur_token->name != TOKEN_PUNCTUATOR_OBRACE)
+                    {
+                        error(parser->cur_token->line, parser->cur_token->column, "Expecting '{' token");
+                    }
+                    parser->cur_function = declarator;
+                    parse_compound_statement(parser);
+                    parser->cur_function = NULL;
+                }
             }
         }
         else
@@ -1457,6 +1472,15 @@ void parse_expression_statement(struct parser_t *parser)
 {
     struct base_exp_node_t *exp;
     exp = parse_exp(parser);
+
+    if(parser->cur_token->type != TOKEN_PUNCTUATOR || parser->cur_token->name != TOKEN_PUNCTUATOR_SEMICOLON)
+    {
+        error(parser->cur_token->line, parser->cur_token->column, "Expecting ';");
+    }
+
+    /* ';' */
+    advance_token(parser);
+
     traverse_exp_tree(exp);
     printf("\n");
 //    translate_expression(expression);
