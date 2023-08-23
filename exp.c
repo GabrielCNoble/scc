@@ -107,9 +107,9 @@ struct base_exp_node_t *additive_exp(struct parser_t *parser)
 //    multiplicative_exp(parser, cur);
 //    token = parser->current_token;
 //
-//    if(token->token_type == TOKEN_PUNCTUATOR)
+//    if(token->type == TOKEN_PUNCTUATOR)
 //    {
-//        switch(token->token_name)
+//        switch(token->name)
 //        {
 //            case TOKEN_PUNCTUATOR_PLUS:
 //                node_type = ADDITIVE_EXP_NODE_TYPE_ADD;
@@ -141,12 +141,12 @@ struct base_exp_node_t *multiplicative_exp(struct parser_t *parser)
     uint32_t has_mult = 0;
 
     left_exp = cast_exp(parser);
-    token = parser->current_token;
+    token = parser->cur_token;
 
-    if(token->token_type == TOKEN_PUNCTUATOR)
+    if(token->type == TOKEN_PUNCTUATOR)
     {
         has_mult = 1;
-        switch(token->token_name)
+        switch(token->name)
         {
             case TOKEN_PUNCTUATOR_ASTERISC:
                 node_type = MULTIPLICATIVE_EXP_NODE_TYPE_MULT;
@@ -186,15 +186,15 @@ struct base_exp_node_t *cast_exp(struct parser_t *parser)
     return unary_exp(parser);
 //    token = parser->current_token;
 
-    if(token->token_type == TOKEN_PUNCTUATOR)
+    if(token->type == TOKEN_PUNCTUATOR)
     {
-//        if(token->token_name == TOKEN_PUNCTUATOR_ASTERISC ||
-//           token->token_name == TOKEN_PUNCTUATOR_SLASH)
+//        if(token->name == TOKEN_PUNCTUATOR_ASTERISC ||
+//           token->name == TOKEN_PUNCTUATOR_SLASH)
 //        {
 //            advance_token(parser);
 //            rec_result = exp_3(parser);
 //
-//            switch(token->token_name)
+//            switch(token->name)
 //            {
 //                case TOKEN_PUNCTUATOR_ASTERISC:
 //                    printf("reg%d = reg%d * reg%d\n", parser->reg_index, result.immediate, rec_result.immediate);
@@ -218,13 +218,13 @@ struct base_exp_node_t *unary_exp(struct parser_t *parser)
     uint32_t node_type;
     uint32_t has_unary = 0;
 
-    token = parser->current_token;
+    token = parser->cur_token;
 
-    switch(token->token_type)
+    switch(token->type)
     {
         case TOKEN_KEYWORD:
             has_unary = 1;
-            switch(token->token_name)
+            switch(token->name)
             {
                 case TOKEN_KEYWORD_SIZEOF:
                     node_type = UNARY_EXP_NODE_TYPE_SIZEOF;
@@ -234,7 +234,7 @@ struct base_exp_node_t *unary_exp(struct parser_t *parser)
 
         case TOKEN_PUNCTUATOR:
             has_unary = 1;
-            switch(token->token_name)
+            switch(token->name)
             {
                 case TOKEN_PUNCTUATOR_ASTERISC:
                     node_type = UNARY_EXP_NODE_TYPE_DEREFERENCE;
@@ -299,12 +299,12 @@ struct base_exp_node_t *postfix_exp(struct parser_t *parser)
     uint32_t has_postfix = 0;
 
     left_exp = primary_exp(parser);
-    token = parser->current_token;
+    token = parser->cur_token;
 
-    if(token->token_type == TOKEN_PUNCTUATOR)
+    if(token->type == TOKEN_PUNCTUATOR)
     {
         has_postfix = 1;
-        switch(token->token_name)
+        switch(token->name)
         {
             case TOKEN_PUNCTUATOR_OPARENTHESIS:
                 node_type = POSTFIX_EXP_NODE_TYPE_FUNC_CALL;
@@ -362,11 +362,11 @@ struct base_exp_node_t *primary_exp(struct parser_t *parser)
 {
     struct token_t *token;
     struct primary_exp_node_t *node = NULL;
-    token = parser->current_token;
+    token = parser->cur_token;
 
     if(token)
     {
-        switch(token->token_type)
+        switch(token->type)
         {
             case TOKEN_IDENTIFIER:
                 node = (struct primary_exp_node_t *)new_node(EXP_NODE_TYPE_PRIMARY);
@@ -377,7 +377,7 @@ struct base_exp_node_t *primary_exp(struct parser_t *parser)
 
             case TOKEN_CONSTANT:
                 node = (struct primary_exp_node_t *)new_node(EXP_NODE_TYPE_PRIMARY);
-                switch(token->token_name)
+                switch(token->name)
                 {
                     case TOKEN_CONSTANT_INTEGER:
                         node->type = PRIMARY_EXP_NODE_TYPE_INTEGER_CONSTANT;
@@ -395,7 +395,7 @@ struct base_exp_node_t *primary_exp(struct parser_t *parser)
             break;
 
             case TOKEN_PUNCTUATOR:
-                if(token->token_name == TOKEN_PUNCTUATOR_OPARENTHESIS)
+                if(token->name == TOKEN_PUNCTUATOR_OPARENTHESIS)
                 {
                     node = (struct primary_exp_node_t *)new_node(EXP_NODE_TYPE_PRIMARY);
                     node->type = PRIMARY_EXP_NODE_TYPE_EXPRESSION;

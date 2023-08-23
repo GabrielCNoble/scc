@@ -32,7 +32,7 @@ int is_declaration_specifier(struct token_t *token);
 
 int is_typedef_name(struct token_t *token);
 
-int type_from_token(struct token_t *token);
+uint32_t type_specifier_from_token(struct token_t *token);
 
 char *type_string(struct base_type_t *type);
 
@@ -63,19 +63,23 @@ struct base_type_t *copy_type(struct base_type_t *type);
 
 //void parse_tokens(struct token_t *tokens);
 
+void error(uint32_t line, uint32_t column, const char *format, ...); 
+
 void parse(char *text);
 
-struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_list);
+struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_list);
 
-struct base_type_t *parse_declarator(struct parser_t *parser);
+struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator_t *declarator);
 
 struct base_type_t *parse_initializer(struct parser_t *parser);
 
-struct base_type_t *parse_aggregate_declaration(struct parser_t *parser);
+struct type_t *parse_aggregate_declaration(struct parser_t *parser);
 
 
 
 void parse_statement(struct parser_t *parser);
+
+void parse_labeled_statement(struct parser_t *parser); 
 
 void parse_compound_statement(struct parser_t *parser);
 

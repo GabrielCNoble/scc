@@ -31,6 +31,7 @@ int main()
         exp[exp_len - 1] = '\0';
 
         parse(exp);
+        printf("done\n");
 
 //        tokens = tokenize(exp);
 

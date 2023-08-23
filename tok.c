@@ -71,8 +71,9 @@ static char char_map[255] = {
     ['Z'] = CHAR_LETTER,
     ['_'] = CHAR_LETTER,
 
-    ['\0'] = CHAR_SPACE,
-    [' '] = CHAR_SPACE,
+    ['\0']  = CHAR_SPACE,
+    [' ']   = CHAR_SPACE,
+    ['\n']  = CHAR_SPACE,
 
     ['+'] = CHAR_PUNCTUATOR,
     ['-'] = CHAR_PUNCTUATOR,
@@ -101,46 +102,46 @@ static char char_map[255] = {
 };
 
 static char *keywords[TOKEN_KEYWORD_UNKNOWN] = {
-    [TOKEN_KEYWORD_AUTO] = "auto",
-    [TOKEN_KEYWORD_BREAK] = "break",
-    [TOKEN_KEYWORD_CASE] = "case",
-    [TOKEN_KEYWORD_CHAR] = "char",
-    [TOKEN_KEYWORD_CONST] = "const",
-    [TOKEN_KEYWORD_CONTINUE] = "continue",
-    [TOKEN_KEYWORD_DEFAULT] = "default",
-    [TOKEN_KEYWORD_DO] = "do",
-    [TOKEN_KEYWORD_DOUBLE] = "double",
-    [TOKEN_KEYWORD_ELSE] = "else",
-    [TOKEN_KEYWORD_ENUM] = "enum",
-    [TOKEN_KEYWORD_EXTERN] = "extern",
-    [TOKEN_KEYWORD_FLOAT] = "float",
-    [TOKEN_KEYWORD_FOR] = "for",
-    [TOKEN_KEYWORD_GOTO] = "goto",
-    [TOKEN_KEYWORD_IF] = "if",
-    [TOKEN_KEYWORD_INLINE] = "inline",
-    [TOKEN_KEYWORD_INT] = "int",
-    [TOKEN_KEYWORD_LONG] = "long",
-    [TOKEN_KEYWORD_REGISTER] = "register",
-    [TOKEN_KEYWORD_RESTRICT] = "restrict",
-    [TOKEN_KEYWORD_RETURN] = "return",
-    [TOKEN_KEYWORD_SHORT] = "short",
-    [TOKEN_KEYWORD_SIGNED] = "signed",
-    [TOKEN_KEYWORD_SIZEOF] = "sizeof",
-    [TOKEN_KEYWORD_STATIC] = "static",
-    [TOKEN_KEYWORD_STRUCT] = "struct",
-    [TOKEN_KEYWORD_SWITCH] = "switch",
-    [TOKEN_KEYWORD_TYPEDEF] = "typedef",
-    [TOKEN_KEYWORD_UNION] = "union",
-    [TOKEN_KEYWORD_UNSIGNED] = "unsigned",
-    [TOKEN_KEYWORD_VOID] = "void",
-    [TOKEN_KEYWORD_VOLATILE] = "volatile",
-    [TOKEN_KEYWORD_WHILE] = "while",
+    [TOKEN_KEYWORD_AUTO]        = "auto",
+    [TOKEN_KEYWORD_BREAK]       = "break",
+    [TOKEN_KEYWORD_CASE]        = "case",
+    [TOKEN_KEYWORD_CHAR]        = "char",
+    [TOKEN_KEYWORD_CONST]       = "const",
+    [TOKEN_KEYWORD_CONTINUE]    = "continue",
+    [TOKEN_KEYWORD_DEFAULT]     = "default",
+    [TOKEN_KEYWORD_DO]          = "do",
+    [TOKEN_KEYWORD_DOUBLE]      = "double",
+    [TOKEN_KEYWORD_ELSE]        = "else",
+    [TOKEN_KEYWORD_ENUM]        = "enum",
+    [TOKEN_KEYWORD_EXTERN]      = "extern",
+    [TOKEN_KEYWORD_FLOAT]       = "float",
+    [TOKEN_KEYWORD_FOR]         = "for",
+    [TOKEN_KEYWORD_GOTO]        = "goto",
+    [TOKEN_KEYWORD_IF]          = "if",
+    [TOKEN_KEYWORD_INLINE]      = "inline",
+    [TOKEN_KEYWORD_INT]         = "int",
+    [TOKEN_KEYWORD_LONG]        = "long",
+    [TOKEN_KEYWORD_REGISTER]    = "register",
+    [TOKEN_KEYWORD_RESTRICT]    = "restrict",
+    [TOKEN_KEYWORD_RETURN]      = "return",
+    [TOKEN_KEYWORD_SHORT]       = "short",
+    [TOKEN_KEYWORD_SIGNED]      = "signed",
+    [TOKEN_KEYWORD_SIZEOF]      = "sizeof",
+    [TOKEN_KEYWORD_STATIC]      = "static",
+    [TOKEN_KEYWORD_STRUCT]      = "struct",
+    [TOKEN_KEYWORD_SWITCH]      = "switch",
+    [TOKEN_KEYWORD_TYPEDEF]     = "typedef",
+    [TOKEN_KEYWORD_UNION]       = "union",
+    [TOKEN_KEYWORD_UNSIGNED]    = "unsigned",
+    [TOKEN_KEYWORD_VOID]        = "void",
+    [TOKEN_KEYWORD_VOLATILE]    = "volatile",
+    [TOKEN_KEYWORD_WHILE]       = "while",
 };
 
-struct token_t lex_token(char *text, uint32_t *offset)
+struct token_t lex_token(char *text, uint32_t *offset, uint32_t *line, uint32_t *column)
 {
-    uint32_t i;
-    uint32_t j;
+    // uint32_t i;
+    // uint32_t j;
 
     struct token_t token;
     static char token_text[8192];
@@ -152,23 +153,26 @@ struct token_t lex_token(char *text, uint32_t *offset)
     uint32_t base;
     uint32_t has_point = 0;
 
-    i = *offset;
+    uint32_t text_offset = *offset;
+
+    uint32_t cur_line = *line;
+    uint32_t cur_column = *column;
 
     _try_again:
-    switch(char_map[(uint32_t)text[i]])
+    switch(char_map[(uint32_t)text[text_offset]])
     {
         case CHAR_NUMBER:
             token_type = TOKEN_CONSTANT;
             token_name = TOKEN_CONSTANT_INTEGER;
 
-            while(char_map[(uint32_t)text[i]] & (CHAR_NUMBER | CHAR_LETTER))
+            while(char_map[(uint32_t)text[text_offset]] & (CHAR_NUMBER | CHAR_LETTER))
             {
-                token_text[token_text_index] = text[i];
-                if(text[i] == '.')
+                token_text[token_text_index] = text[text_offset];
+                if(text[text_offset] == '.')
                 {
                     has_point++;
                 }
-                i++;
+                text_offset++;
                 token_text_index++;
             }
 
@@ -210,22 +214,22 @@ struct token_t lex_token(char *text, uint32_t *offset)
             token_type = TOKEN_IDENTIFIER;
             token_name = TOKEN_UNKNOWN;
 
-            while(char_map[(uint32_t)text[i]] & (CHAR_LETTER | CHAR_NUMBER))
+            while(char_map[(uint32_t)text[text_offset]] & (CHAR_LETTER | CHAR_NUMBER))
             {
-                token_text[token_text_index] = text[i];
-                i++;
+                token_text[token_text_index] = text[text_offset];
+                text_offset++;
                 token_text_index++;
             }
 
             token_text[token_text_index] = '\0';
 
             /* check to see whether this is a reserved keyword... */
-            for(j = TOKEN_KEYWORD_AUTO; j < TOKEN_KEYWORD_WHILE; j++)
+            for(uint32_t keyword_index = TOKEN_KEYWORD_FIRST; keyword_index < TOKEN_KEYWORD_LAST; keyword_index++)
             {
-                if(!strcmp(keywords[j], token_text))
+                if(!strcmp(keywords[keyword_index], token_text))
                 {
                     token_type = TOKEN_KEYWORD;
-                    token_name = j;
+                    token_name = keyword_index;
                     /* yup... */
                     break;
                 }
@@ -241,19 +245,19 @@ struct token_t lex_token(char *text, uint32_t *offset)
         case CHAR_PUNCTUATOR:
             token_type = TOKEN_PUNCTUATOR;
 
-            switch(text[i])
+            switch(text[text_offset])
             {
                 case '+':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '+')
+                    if(text[text_offset] == '+')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_INCREMENT;
                     }
-                    else if(text[i] == '=')
+                    else if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_PLUS_ASSIGN;
                     }
                     else
@@ -264,21 +268,21 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '-':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '-')
+                    if(text[text_offset] == '-')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_DECREMENT;
                     }
-                    else if(text[i] == '=')
+                    else if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_MINUS_ASSIGN;
                     }
-                    else if(text[i] == '>')
+                    else if(text[text_offset] == '>')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_ARROW;
                     }
                     else
@@ -288,11 +292,11 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '*':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '=')
+                    if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_MUL_ASSIGN;
                     }
                     else
@@ -303,11 +307,11 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '/':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '=')
+                    if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_DIV_ASSIGN;
                     }
                     else
@@ -317,11 +321,11 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '%':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '=')
+                    if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_MOD_ASSIGN;
                     }
                     else
@@ -331,11 +335,11 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '=':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '=')
+                    if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_EQUAL;
                     }
                     else
@@ -345,20 +349,20 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '<':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '=')
+                    if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_LESS_THAN_OR_EQUAL;
                     }
-                    else if(text[i] == '<')
+                    else if(text[text_offset] == '<')
                     {
-                        i++;
+                        text_offset++;
 
-                        if(text[i] == '=')
+                        if(text[text_offset] == '=')
                         {
-                            i++;
+                            text_offset++;
                             token_name = TOKEN_PUNCTUATOR_LEFT_SHIFT_ASSIGN;
                         }
                         else
@@ -373,20 +377,20 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '>':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '=')
+                    if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_GREATER_THAN_OR_EQUAL;
                     }
-                    else if(text[i] == '>')
+                    else if(text[text_offset] == '>')
                     {
-                        i++;
+                        text_offset++;
 
-                        if(text[i] == '=')
+                        if(text[text_offset] == '=')
                         {
-                            i++;
+                            text_offset++;
                             token_name = TOKEN_PUNCTUATOR_RIGHT_SHIFT_ASSIGN;
                         }
                         else
@@ -401,56 +405,56 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '(':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_OPARENTHESIS;
                 break;
 
                 case ')':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_CPARENTHESIS;
                 break;
 
                 case '{':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_OBRACE;
                 break;
 
                 case '}':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_CBRACE;
                 break;
 
                 case '[':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_OBRACKET;
                 break;
 
                 case ']':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_CBRACKET;
                 break;
 
                 case ',':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_COMMA;
                 break;
 
                 case ';':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_SEMICOLON;
                 break;
 
                 case ':':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_COLON;
                 break;
 
                 case '!':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '=')
+                    if(text[text_offset] == '=')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_NOT_EQUAL;
                     }
                     else
@@ -460,16 +464,16 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '~':
-                    i++;
+                    text_offset++;
                     token_name = TOKEN_PUNCTUATOR_TILDE;
                 break;
 
                 case '&':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '&')
+                    if(text[text_offset] == '&')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_LOG_AND;
                     }
                     else
@@ -480,11 +484,11 @@ struct token_t lex_token(char *text, uint32_t *offset)
                 break;
 
                 case '|':
-                    i++;
+                    text_offset++;
 
-                    if(text[i] == '|')
+                    if(text[text_offset] == '|')
                     {
-                        i++;
+                        text_offset++;
                         token_name = TOKEN_PUNCTUATOR_LOG_OR;
                     }
                     else
@@ -499,14 +503,14 @@ struct token_t lex_token(char *text, uint32_t *offset)
 
                 case '"':
                     token_type = TOKEN_STRING_LITERAL;
-                    i++;
-                    while(text[i] != '"' && text[i] != '\0')
+                    text_offset++;
+                    while(text[text_offset] != '"' && text[text_offset] != '\0')
                     {
-                        token_text[token_text_index] = text[i];
+                        token_text[token_text_index] = text[text_offset];
                         token_text_index++;
-                        i++;
+                        text_offset++;
                     }
-                    i++;
+                    text_offset++;
                     token_text[token_text_index] = '\0';
                     constant.string_constant = token_text;
                 break;
@@ -514,17 +518,29 @@ struct token_t lex_token(char *text, uint32_t *offset)
         break;
 
         case CHAR_UNKNOWN:
-            i++;
+            text_offset++;
             token_type = TOKEN_UNKNOWN;
             token_name = TOKEN_UNKNOWN;
         break;
 
         case CHAR_SPACE:
-            if(text[i])
+            if(text[text_offset])
             {
-                while(char_map[(uint32_t)text[i]] == CHAR_SPACE)
+                while(char_map[(uint32_t)text[text_offset]] == CHAR_SPACE)
                 {
-                    i++;
+                    switch(text[text_offset])
+                    {
+                        case ' ':
+                            cur_column++;
+                        break;
+
+                        case '\n':
+                            cur_line++;
+                            cur_column = 0;
+                        break;
+                    }
+                    
+                    text_offset++;
                 }
                 goto _try_again;
             }
@@ -536,9 +552,13 @@ struct token_t lex_token(char *text, uint32_t *offset)
     }
 
     token.constant = constant;
-    token.token_type = token_type;
-    token.token_name = token_name;
-    *offset = i;
+    token.type = token_type;
+    token.name = token_name;
+    token.column = cur_column;
+    token.line = cur_line;
+    *column = cur_column + text_offset - *offset;
+    *line = cur_line;
+    *offset = text_offset;
 
     return token;
 }
@@ -552,17 +572,20 @@ struct token_t *lex_tokens(char *text)
     struct token_t *new_token = NULL;
     struct token_t token;
 
+    uint32_t column = 0;
+    uint32_t line = 0;
+
     while(text[i])
     {
-        token = lex_token(text, &i);
-        if(token.token_type == TOKEN_UNKNOWN)
+        token = lex_token(text, &i, &column, &line);
+        if(token.type == TOKEN_UNKNOWN)
         {
             continue;
         }
         new_token = calloc(sizeof(struct token_t), 1);
         memcpy(new_token, &token, sizeof(struct token_t));
-        if(new_token->token_type == TOKEN_IDENTIFIER ||
-           new_token->token_type == TOKEN_STRING_LITERAL)
+        if(new_token->type == TOKEN_IDENTIFIER ||
+           new_token->type == TOKEN_STRING_LITERAL)
         {
             new_token->constant.string_constant = strdup(token.constant.string_constant);
         }
@@ -580,8 +603,8 @@ struct token_t *lex_tokens(char *text)
     }
 
     new_token = calloc(sizeof(struct token_t), 1);
-    new_token->token_type = TOKEN_EOF;
-    new_token->token_name = TOKEN_EOF;
+    new_token->type = TOKEN_EOF;
+    new_token->name = TOKEN_EOF;
 
     if(!tokens)
     {
@@ -603,8 +626,8 @@ void free_tokens(struct token_t *tokens)
 
     while(tokens)
     {
-        if(tokens->token_type == TOKEN_STRING_LITERAL ||
-            tokens->token_type == TOKEN_IDENTIFIER);
+        if(tokens->type == TOKEN_STRING_LITERAL ||
+            tokens->type == TOKEN_IDENTIFIER);
         {
             free(tokens->constant.string_constant);
         }
@@ -618,7 +641,7 @@ void free_tokens(struct token_t *tokens)
 void translate_token(struct token_t *token)
 {
 
-    switch(token->token_type)
+    switch(token->type)
     {
         case TOKEN_EOF:
             printf("TOKEN_EOF\n");
@@ -637,7 +660,7 @@ void translate_token(struct token_t *token)
         break;
 
         case TOKEN_KEYWORD:
-            switch(token->token_name)
+            switch(token->name)
             {
                 case TOKEN_KEYWORD_AUTO:
                     printf("TOKEN_KEYWORD_AUTO\n");
@@ -783,7 +806,7 @@ void translate_token(struct token_t *token)
         break;
 
         case TOKEN_PUNCTUATOR:
-            switch(token->token_name)
+            switch(token->name)
             {
                 case TOKEN_PUNCTUATOR_AMPERSAND:
                     printf("TOKEN_PUNCTUATOR_AMPERSAND\n");

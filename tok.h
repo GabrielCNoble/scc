@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-struct token_t lex_token(char *text, uint32_t *offset);
+struct token_t lex_token(char *text, uint32_t *offset, uint32_t *line, uint32_t *column);
 
 struct token_t *lex_tokens(char *text);
 

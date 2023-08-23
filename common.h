@@ -88,41 +88,68 @@ enum TOKEN_PUNCTUATOR
 
 enum TOKEN_KEYWORD
 {
-    TOKEN_KEYWORD_AUTO = 0,
-    TOKEN_KEYWORD_BREAK,
+    TOKEN_KEYWORD_FIRST = 0,
+    TOKEN_KEYWORD_BREAK = TOKEN_KEYWORD_FIRST,
     TOKEN_KEYWORD_CASE,
-    TOKEN_KEYWORD_CHAR,
+    
     TOKEN_KEYWORD_CONST,
     TOKEN_KEYWORD_CONTINUE,
     TOKEN_KEYWORD_DEFAULT,
     TOKEN_KEYWORD_DO,
-    TOKEN_KEYWORD_DOUBLE,
+    
     TOKEN_KEYWORD_ELSE,
     TOKEN_KEYWORD_ENUM,
-    TOKEN_KEYWORD_EXTERN,
-    TOKEN_KEYWORD_FLOAT,
+    
+    
     TOKEN_KEYWORD_FOR,
     TOKEN_KEYWORD_GOTO,
     TOKEN_KEYWORD_IF,
     TOKEN_KEYWORD_INLINE,
-    TOKEN_KEYWORD_INT,
+
+    /********************************/
+    TOKEN_KEYWORD_FIRST_TYPE_SPECIFIER,
+    TOKEN_KEYWORD_INT = TOKEN_KEYWORD_FIRST_TYPE_SPECIFIER,
+    TOKEN_KEYWORD_SHORT,
+    TOKEN_KEYWORD_CHAR,
+    TOKEN_KEYWORD_FLOAT,
+    TOKEN_KEYWORD_DOUBLE,
     TOKEN_KEYWORD_LONG,
+    TOKEN_KEYWORD_UNSIGNED,
+    TOKEN_KEYWORD_SIGNED,
+    TOKEN_KEYWORD_VOID,
+    TOKEN_KEYWORD_STRUCT,
+    TOKEN_KEYWORD_UNION,
+    TOKEN_KEYWORD_LAST_TYPE_SPECIFIER = TOKEN_KEYWORD_UNION,
+    /********************************/
+
+    /********************************/
+    TOKEN_KEYWORD_FIRST_STORAGE_CLASS_SPECIFIER,
+    TOKEN_KEYWORD_TYPEDEF = TOKEN_KEYWORD_FIRST_STORAGE_CLASS_SPECIFIER,
+    TOKEN_KEYWORD_EXTERN,
+    TOKEN_KEYWORD_STATIC,
+    TOKEN_KEYWORD_AUTO,
     TOKEN_KEYWORD_REGISTER,
+    TOKEN_KEYWORD_LAST_STORAGE_CLASS_SPECIFIER = TOKEN_KEYWORD_REGISTER,
+    /********************************/
+
+
+    
     TOKEN_KEYWORD_RESTRICT,
     TOKEN_KEYWORD_RETURN,
-    TOKEN_KEYWORD_SHORT,
-    TOKEN_KEYWORD_SIGNED,
+    
+    
     TOKEN_KEYWORD_SIZEOF,
-    TOKEN_KEYWORD_STATIC,
-    TOKEN_KEYWORD_STRUCT,
+    
+    
     TOKEN_KEYWORD_SWITCH,
-    TOKEN_KEYWORD_TYPEDEF,
-    TOKEN_KEYWORD_UNION,
-    TOKEN_KEYWORD_UNSIGNED,
-    TOKEN_KEYWORD_VOID,
+    
+    
+    
+    
     TOKEN_KEYWORD_VOLATILE,
     TOKEN_KEYWORD_WHILE,
     TOKEN_KEYWORD_UNKNOWN,
+    TOKEN_KEYWORD_LAST = TOKEN_KEYWORD_UNKNOWN
 };
 
 union constant_t
@@ -155,58 +182,138 @@ struct token_t
 
 /* not everything here is a type specifier, but this makes the parser
 implementation simpler, and also allow for easy type comparison... */
-enum TYPE
+enum DECL_SPEC
 {
-    TYPE_INT = 0,
-    TYPE_SHORT,
-    TYPE_CHAR,
-    TYPE_FLOAT,
-    TYPE_DOUBLE,
-    TYPE_LONG,
-    TYPE_UNSIGNED,
-    TYPE_CONST,
-    TYPE_VOLATILE,
-    TYPE_RESTRICT,
-    TYPE_EXTERN,
-    TYPE_SIGNED,
-    TYPE_VOID,
+    DECL_SPEC_INT = 0,
+    DECL_SPEC_SHORT,
+    DECL_SPEC_CHAR,
+    DECL_SPEC_FLOAT,
+    DECL_SPEC_DOUBLE,
+    DECL_SPEC_LONG,
+    DECL_SPEC_UNSIGNED,
+    DECL_SPEC_CONST,
+    DECL_SPEC_VOLATILE,
+    DECL_SPEC_RESTRICT,
+    // DECL_SPEC_EXTERN,
+    DECL_SPEC_SIGNED,
+    DECL_SPEC_VOID,
+    DECL_SPEC_STRUCT,
+    DECL_SPEC_UNION,
+    // DECL_SPEC_POINTER,
+    // TYPE_SPECIFIER_TYPEDEF,
+    // DECL_SPEC_FUNCTION,
+    // DECL_SPEC_ARRAY,
+    // DECL_SPEC_LINK,              /* this is only here to make the implementation easier...  */
+    // TYPE_SPECIFIER_IDENTIFIER,             /* this is only here to make the implementation easier... */
+
+    DECL_SPEC_TYPEDEF,
+    DECL_SPEC_EXTERN,
+    DECL_SPEC_STATIC,
+    DECL_SPEC_AUTO,
+    DECL_SPEC_REGISTER,
+    DECL_SPEC_UNKNOWN,
+};
+
+enum TYPE_QUALIFIER
+{
+    TYPE_QUALIFIER_CONST,
+    TYPE_QUALIFIER_RESTRICT,
+    TYPE_QUALIFIER_VOLATILE,
+};
+
+struct decl_spec_t
+{
+    struct decl_spec_t *    next;
+    uint32_t                specifier;
+};
+
+enum TYPES
+{
+    TYPE_PRIMITIVE,
+    TYPE_ARRAY,
+    TYPE_POINTER,
     TYPE_STRUCT,
     TYPE_UNION,
-    TYPE_POINTER,
-    TYPE_TYPEDEF,
     TYPE_FUNCTION,
-    TYPE_ARRAY,
-    TYPE_LINK,              /* this is only here to make the implementation easier...  */
-    TYPE_IDENTIFIER,             /* this is only here to make the implementation easier... */
     TYPE_UNKNOWN,
+};
+
+struct pointer_t
+{
+    uint32_t                count;
+    struct pointer_t *      next;
+    struct decl_spec_t *    qualifiers;
+};
+
+/* forward declaration */
+struct declarator_t;
+
+struct type_t 
+{
+    struct type_t *         next;
+    struct decl_spec_t *    specifiers;
+    struct pointer_t *      pointer;
+    struct pointer_t *      last_pointer;
+    uint32_t                type;
+
+    union
+    {
+        struct 
+        { 
+            /* used for struct/union tags and field names */
+            char *                  identifier;
+            struct declarator_t *   fields; 
+            uint32_t                field_count; 
+        } aggregate; 
+
+        struct
+        {
+            uint32_t                elem_count;
+        } array;
+
+        struct
+        {
+            struct declarator_t *   args;
+            uint32_t                arg_count;
+            uint32_t                prototype;
+            struct scope_t *        body;
+        } func;
+    };
+};
+
+struct declarator_t
+{
+    struct declarator_t *   next;
+    char *                  identifier;
+    struct type_t *         type;
 };
 
 struct base_type_t
 {
     struct base_type_t *next;
-    unsigned short type;
+    uint32_t            type;
 };
 
 struct array_type_t
 {
-    struct base_type_t base;
-    struct base_type_t *base_type;
-    int size;
+    struct base_type_t      base;
+    struct base_type_t *    elem_type;
+    uint32_t                size;
 };
 
 struct aggretage_type_t
 {
-    struct base_type_t base;
-    struct link_type_t *fields;
-    char *name;
+    struct base_type_t      base;
+    struct link_type_t *    fields;
+    char *                  name;
 };
 
 struct function_type_t
 {
-    struct base_type_t base;
-    struct link_type_t *args;
-    int arg_count;
-    int old_style;
+    struct base_type_t      base;
+    struct link_type_t *    args;
+    uint32_t                arg_count;
+    uint32_t                old_style;
 };
 
 /* not really a type, but is here
@@ -214,7 +321,7 @@ to make implementation easier... */
 struct identifier_type_t
 {
     struct base_type_t base;
-    char *identifier;
+    char *             identifier;
 };
 
 /* used to link types together, as in
@@ -379,12 +486,13 @@ enum STORAGE_CLASS
 
 struct object_t
 {
-    struct object_t *next;
-    struct scope_t *scope;
-    struct base_type_t *type;
-    char *id;
-    int storage_class;
-    unsigned int offset;            /* offset from the segment pointer... */
+    struct object_t *   next;
+    struct scope_t *    scope;
+    struct type_t *     type;
+    // struct base_type_t *type;
+    char *              identifier;
+    int                 storage_class;
+    unsigned int        offset;            /* offset from the segment pointer... */
 };
 
 struct function_t
@@ -438,10 +546,13 @@ struct switch_statement_t
 
 struct scope_t
 {
-    struct scope_t *parent;
-    struct object_t *objects;
-    struct object_t *last_object;
-    uint32_t active;
+    struct scope_t *    parent;
+    struct scope_t *    children;
+    struct scope_t *    last_child;
+    struct scope_t *    next;
+    struct object_t *   objects;
+    struct object_t *   last_object;
+    uint32_t            active;
 };
 
 /*
@@ -453,21 +564,21 @@ struct scope_t
 
 struct parser_t
 {
-    struct token_t *tokens;
-    struct token_t *current_token;
-    struct token_t *next_token;
+    struct token_t *            tokens;
+    struct token_t *            cur_token;
+    struct token_t *            next_token;
 
-    int declaration_depth;
+    uint32_t                    declaration_depth;
 
-    int param_list_level;
-    int aggregate_level;
+    uint32_t                    param_list_level;
+    uint32_t                    aggregate_level;
 
-    struct aggretage_type_t *aggregate_types;
-    struct base_type_t *typedef_types;
+    struct aggretage_type_t *   aggregate_types;
+    struct base_type_t *        typedef_types;
 
 //    int scope_stack_top;
 //    struct scope_t **scope_stack;
-    struct scope_t *current_scope;
+    struct scope_t *            current_scope;
 };
 
 #endif // COMMON_H

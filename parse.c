@@ -9,40 +9,91 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdarg.h>
 
+char *type_specifier_strings[] = {
+    [DECL_SPEC_INT]        = "int",
+    [DECL_SPEC_SHORT]      = "short",
+    [DECL_SPEC_CHAR]       = "char",
+    [DECL_SPEC_FLOAT]      = "float",
+    [DECL_SPEC_DOUBLE]     = "double",
+    [DECL_SPEC_LONG]       = "long",
+    [DECL_SPEC_UNSIGNED]   = "unsigned",
+    [DECL_SPEC_SIGNED]     = "signed",
+    [DECL_SPEC_VOID]       = "void",
+    [DECL_SPEC_STRUCT]     = "struct",
+    [DECL_SPEC_UNION]      = "union",
+    // [TYPE_SPECIFIER_FUNCTION]   = "function",
+    // TYPE_SPECIFIER_ARRAY,
+    // TYPE_SPECIFIER_LINK,              /* this is only here to make the implementation easier...  */
+    // TYPE_SPECIFIER_UNKNOWN,
+};
 
+uint32_t decl_specifier_lut[] = {
+    [TOKEN_KEYWORD_INT]         = DECL_SPEC_INT,
+    [TOKEN_KEYWORD_SHORT]       = DECL_SPEC_SHORT,
+    [TOKEN_KEYWORD_CHAR]        = DECL_SPEC_CHAR,
+    [TOKEN_KEYWORD_FLOAT]       = DECL_SPEC_FLOAT,
+    [TOKEN_KEYWORD_DOUBLE]      = DECL_SPEC_DOUBLE,
+    [TOKEN_KEYWORD_LONG]        = DECL_SPEC_LONG,
+    [TOKEN_KEYWORD_UNSIGNED]    = DECL_SPEC_UNSIGNED,
+    [TOKEN_KEYWORD_SIGNED]      = DECL_SPEC_SIGNED,
+    [TOKEN_KEYWORD_VOID]        = DECL_SPEC_VOID,
+    [TOKEN_KEYWORD_STRUCT]      = DECL_SPEC_STRUCT,
+    [TOKEN_KEYWORD_UNION]       = DECL_SPEC_UNION,
+
+    [TOKEN_KEYWORD_CONST]       = DECL_SPEC_CONST,
+    [TOKEN_KEYWORD_RESTRICT]    = DECL_SPEC_RESTRICT,
+    [TOKEN_KEYWORD_VOLATILE]    = DECL_SPEC_VOLATILE,
+
+    [TOKEN_KEYWORD_TYPEDEF]     = DECL_SPEC_TYPEDEF,
+    [TOKEN_KEYWORD_EXTERN]      = DECL_SPEC_EXTERN,
+    [TOKEN_KEYWORD_STATIC]      = DECL_SPEC_STATIC,
+    [TOKEN_KEYWORD_AUTO]        = DECL_SPEC_AUTO,
+    [TOKEN_KEYWORD_REGISTER]    = DECL_SPEC_REGISTER
+};
+
+// uint32_t type_specifier_lut[] = {
+//     [TOKEN_KEYWORD_INT]         = DECL_SPEC_INT,
+//     [TOKEN_KEYWORD_SHORT]       = DECL_SPEC_SHORT,
+//     [TOKEN_KEYWORD_CHAR]        = DECL_SPEC_CHAR,
+//     [TOKEN_KEYWORD_FLOAT]       = DECL_SPEC_FLOAT,
+//     [TOKEN_KEYWORD_DOUBLE]      = DECL_SPEC_DOUBLE,
+//     [TOKEN_KEYWORD_LONG]        = DECL_SPEC_LONG,
+//     [TOKEN_KEYWORD_UNSIGNED]    = DECL_SPEC_UNSIGNED,
+//     [TOKEN_KEYWORD_SIGNED]      = DECL_SPEC_SIGNED,
+//     [TOKEN_KEYWORD_VOID]        = DECL_SPEC_VOID,
+//     [TOKEN_KEYWORD_STRUCT]      = DECL_SPEC_STRUCT,
+//     [TOKEN_KEYWORD_UNION]       = DECL_SPEC_UNION,
+// };
+
+// uint32_t type_qualifier_lut[] = {
+//     [TOKEN_KEYWORD_CONST]       = DECL_SPEC_CONST,
+//     [TOKEN_KEYWORD_RESTRICT]    = DECL_SPEC_RESTRICT,
+//     [TOKEN_KEYWORD_VOLATILE]    = DECL_SPEC_VOLATILE,
+// };
+
+// uint32_t storage_class_specifier_lut[] = {
+//     [TOKEN_KEYWORD_TYPEDEF]     = DECL_SPEC_TYPEDEF,
+//     [TOKEN_KEYWORD_EXTERN]      = DECL_SPEC_EXTERN,
+//     [TOKEN_KEYWORD_STATIC]      = DECL_SPEC_STATIC,
+//     [TOKEN_KEYWORD_AUTO]        = DECL_SPEC_AUTO,
+//     [TOKEN_KEYWORD_REGISTER]    = DECL_SPEC_REGISTER
+// };
 
 
 int is_type_specifier(struct token_t *token)
 {
-    if(token->token_type == TOKEN_KEYWORD)
-    {
-        switch(token->token_name)
-        {
-            case TOKEN_KEYWORD_INT:
-            case TOKEN_KEYWORD_SHORT:
-            case TOKEN_KEYWORD_LONG:
-            case TOKEN_KEYWORD_CHAR:
-            case TOKEN_KEYWORD_FLOAT:
-            case TOKEN_KEYWORD_DOUBLE:
-            case TOKEN_KEYWORD_SIGNED:
-            case TOKEN_KEYWORD_UNSIGNED:
-            case TOKEN_KEYWORD_VOID:
-            case TOKEN_KEYWORD_STRUCT:
-            case TOKEN_KEYWORD_UNION:
-            case TOKEN_KEYWORD_ENUM:
-                return 1;
-        }
-    }
-
-    return 0;
+    return token->type == TOKEN_KEYWORD && 
+        token->name >= TOKEN_KEYWORD_FIRST_TYPE_SPECIFIER && 
+        token->name <= TOKEN_KEYWORD_LAST_TYPE_SPECIFIER;
 }
 
 int is_type_qualifier(struct token_t *token)
 {
-    if(token->token_type == TOKEN_KEYWORD)
+    if(token->type == TOKEN_KEYWORD)
     {
-        switch(token->token_name)
+        switch(token->name)
         {
             case TOKEN_KEYWORD_CONST:
             case TOKEN_KEYWORD_RESTRICT:
@@ -56,20 +107,23 @@ int is_type_qualifier(struct token_t *token)
 
 int is_storage_class_specifier(struct token_t *token)
 {
-    if(token->token_type == TOKEN_KEYWORD)
-    {
-        switch(token->token_name)
-        {
-            case TOKEN_KEYWORD_TYPEDEF:
-            case TOKEN_KEYWORD_EXTERN:
-            case TOKEN_KEYWORD_STATIC:
-            case TOKEN_KEYWORD_AUTO:
-            case TOKEN_KEYWORD_REGISTER:
-                return 1;
-        }
-    }
+    return token->type == TOKEN_KEYWORD && 
+        token->name >= TOKEN_KEYWORD_FIRST_STORAGE_CLASS_SPECIFIER &&
+        token->name <= TOKEN_KEYWORD_LAST_STORAGE_CLASS_SPECIFIER;
+    // if(token->type == TOKEN_KEYWORD)
+    // {
+    //     switch(token->name)
+    //     {
+    //         case TOKEN_KEYWORD_TYPEDEF:
+    //         case TOKEN_KEYWORD_EXTERN:
+    //         case TOKEN_KEYWORD_STATIC:
+    //         case TOKEN_KEYWORD_AUTO:
+    //         case TOKEN_KEYWORD_REGISTER:
+    //             return 1;
+    //     }
+    // }
 
-    return 0;
+    // return 0;
 }
 
 int is_declaration_specifier(struct token_t *token)
@@ -84,123 +138,100 @@ int is_typedef_name(struct token_t *token)
     return 0;
 }
 
-int type_from_token(struct token_t *token)
+uint32_t type_specifier_from_token(struct token_t *token)
 {
-    switch(token->token_name)
+    if(is_type_specifier(token))
     {
-        case TOKEN_KEYWORD_INT:
-            return TYPE_INT;
-
-        case TOKEN_KEYWORD_VOID:
-            return TYPE_VOID;
-
-        case TOKEN_KEYWORD_SHORT:
-            return TYPE_SHORT;
-
-        case TOKEN_KEYWORD_CHAR:
-            return TYPE_CHAR;
-
-        case TOKEN_KEYWORD_FLOAT:
-            return TYPE_FLOAT;
-
-        case TOKEN_KEYWORD_DOUBLE:
-            return TYPE_DOUBLE;
-
-        case TOKEN_KEYWORD_STRUCT:
-            return TYPE_STRUCT;
-
-        case TOKEN_KEYWORD_UNION:
-            return TYPE_UNION;
-
-        default:
-            return TYPE_UNKNOWN;
-    }
-}
-
-char *type_string(struct base_type_t *type)
-{
-    switch(type->type)
-    {
-        case TYPE_INT:
-            return "int";
-        break;
-
-        case TYPE_SHORT:
-            return "short";
-        break;
-
-        case TYPE_CHAR:
-            return "char";
-        break;
-
-        case TYPE_FLOAT:
-            return "float";
-        break;
-
-        case TYPE_DOUBLE:
-            return "double";
-        break;
-
-        case TYPE_LONG:
-            return "long";
-        break;
-
-        case TYPE_UNSIGNED:
-            return "unsigned";
-        break;
-
-        case TYPE_SIGNED:
-            return "signed";
-        break;
-
-        case TYPE_VOID:
-            return "void";
-        break;
-
-        case TYPE_STRUCT:
-            return "struct";
-        break;
-
-        case TYPE_UNION:
-            return "union";
-        break;
-
-        case TYPE_POINTER:
-            return "pointer";
-        break;
-
-        case TYPE_FUNCTION:
-            return "function";
-        break;
-
-        case TYPE_ARRAY:
-            return "array";
-        break;
-
-        case TYPE_IDENTIFIER:
-            return "identifier";
-        break;
-
-        case TYPE_UNKNOWN:
-        default:
-            return "unknown";
-        break;
+        return decl_specifier_lut[token->name];
     }
 
+    return DECL_SPEC_UNKNOWN;
 }
+
+// char *type_string(struct base_type_t *type)
+// {
+//     switch(type->type)
+//     {
+//         case TYPE_INT:
+//             return "int";
+//         break;
+
+//         case TYPE_SHORT:
+//             return "short";
+//         break;
+
+//         case TYPE_CHAR:
+//             return "char";
+//         break;
+
+//         case TYPE_FLOAT:
+//             return "float";
+//         break;
+
+//         case TYPE_DOUBLE:
+//             return "double";
+//         break;
+
+//         case TYPE_LONG:
+//             return "long";
+//         break;
+
+//         case TYPE_UNSIGNED:
+//             return "unsigned";
+//         break;
+
+//         case TYPE_SIGNED:
+//             return "signed";
+//         break;
+
+//         case TYPE_VOID:
+//             return "void";
+//         break;
+
+//         case TYPE_STRUCT:
+//             return "struct";
+//         break;
+
+//         case TYPE_UNION:
+//             return "union";
+//         break;
+
+//         case TYPE_POINTER:
+//             return "pointer";
+//         break;
+
+//         case TYPE_FUNCTION:
+//             return "function";
+//         break;
+
+//         case TYPE_ARRAY:
+//             return "array";
+//         break;
+
+//         case TYPE_IDENTIFIER:
+//             return "identifier";
+//         break;
+
+//         case TYPE_UNKNOWN:
+//         default:
+//             return "unknown";
+//         break;
+//     }
+
+// }
 
 void advance_token(struct parser_t *parser)
 {
-    if(!parser->current_token)
+    if(!parser->cur_token)
     {
-        parser->current_token = parser->tokens;
+        parser->cur_token = parser->tokens;
     }
-    else if(parser->current_token->token_type != TOKEN_EOF)
+    else if(parser->cur_token->type != TOKEN_EOF)
     {
-        parser->current_token = parser->current_token->next;
+        parser->cur_token = parser->cur_token->next;
     }
 
-    parser->next_token = parser->current_token->next;
+    parser->next_token = parser->cur_token->next;
 }
 
 /*
@@ -265,83 +296,83 @@ struct base_type_t *copy_type(struct base_type_t *type)
 
     int size;
 
-    while(type)
-    {
-        switch(type->type)
-        {
-        case TYPE_INT:
-            case TYPE_SHORT:
-            case TYPE_CHAR:
-            case TYPE_FLOAT:
-            case TYPE_DOUBLE:
-            case TYPE_LONG:
-            case TYPE_UNSIGNED:
-            case TYPE_CONST:
-            case TYPE_VOLATILE:
-            case TYPE_RESTRICT:
-            case TYPE_EXTERN:
-            case TYPE_SIGNED:
-            case TYPE_VOID:
-            case TYPE_POINTER:
-                size = sizeof(struct base_type_t);
-            break;
+    // while(type)
+    // {
+    //     switch(type->type)
+    //     {
+    //     case TYPE_INT:
+    //         case TYPE_SHORT:
+    //         case TYPE_CHAR:
+    //         case TYPE_FLOAT:
+    //         case TYPE_DOUBLE:
+    //         case TYPE_LONG:
+    //         case TYPE_UNSIGNED:
+    //         case TYPE_CONST:
+    //         case TYPE_VOLATILE:
+    //         case TYPE_RESTRICT:
+    //         case TYPE_EXTERN:
+    //         case TYPE_SIGNED:
+    //         case TYPE_VOID:
+    //         case TYPE_POINTER:
+    //             size = sizeof(struct base_type_t);
+    //         break;
 
-            case TYPE_STRUCT:
-            case TYPE_UNION:
-                size = sizeof(struct aggretage_type_t);
-            break;
+    //         case TYPE_STRUCT:
+    //         case TYPE_UNION:
+    //             size = sizeof(struct aggretage_type_t);
+    //         break;
 
-            case TYPE_FUNCTION:
-                size = sizeof(struct function_type_t);
-            break;
+    //         case TYPE_FUNCTION:
+    //             size = sizeof(struct function_type_t);
+    //         break;
 
-            case TYPE_ARRAY:
-                size = sizeof(struct array_type_t);
-            break;
+    //         case TYPE_ARRAY:
+    //             size = sizeof(struct array_type_t);
+    //         break;
 
-            case TYPE_TYPEDEF:
-                size = sizeof(struct typedef_type_t);
-            break;
+    //         case TYPE_TYPEDEF:
+    //             size = sizeof(struct typedef_type_t);
+    //         break;
 
-            case TYPE_IDENTIFIER:
-                size = sizeof(struct identifier_type_t);
-            break;
+    //         case TYPE_IDENTIFIER:
+    //             size = sizeof(struct identifier_type_t);
+    //         break;
 
-            case TYPE_LINK:
-                size = sizeof(struct link_type_t);
-            break;
-        }
+    //         case TYPE_LINK:
+    //             size = sizeof(struct link_type_t);
+    //         break;
+    //     }
 
-        new_type = calloc(size, 1);
-        memcpy(new_type, type, size);
-        new_type->next = NULL;
+    //     new_type = calloc(size, 1);
+    //     memcpy(new_type, type, size);
+    //     new_type->next = NULL;
 
-        if(new_type->type == TYPE_FUNCTION)
-        {
-            function_type = (struct function_type_t *)new_type;
-            function = (struct function_type_t *)type;
-            function_type->args = (struct link_type_t *)copy_type((struct base_type_t *)function->args);
-        }
-        else if(new_type->type == TYPE_LINK)
-        {
-            link_type = (struct link_type_t *)new_type;
-            link = (struct link_type_t *)type;
-            link_type->type = copy_type(link->type);
-        }
+    //     if(new_type->type == TYPE_FUNCTION)
+    //     {
+    //         function_type = (struct function_type_t *)new_type;
+    //         function = (struct function_type_t *)type;
+    //         function_type->args = (struct link_type_t *)copy_type((struct base_type_t *)function->args);
+    //     }
+    //     else if(new_type->type == TYPE_LINK)
+    //     {
+    //         link_type = (struct link_type_t *)new_type;
+    //         link = (struct link_type_t *)type;
+    //         link_type->type = copy_type(link->type);
+    //     }
 
-        if(!first_type)
-        {
-            first_type = new_type;
-        }
-        else
-        {
-            last_type->next = new_type;
-        }
+    //     if(!first_type)
+    //     {
+    //         first_type = new_type;
+    //     }
+    //     else
+    //     {
+    //         last_type->next = new_type;
+    //     }
 
-        last_type = new_type;
+    //     last_type = new_type;
 
-        type = type->next;
-    }
+    //     type = type->next;
+    // }
 
     return first_type;
 }
@@ -367,7 +398,7 @@ void parse_tokens(struct token_t *tokens)
 //    memset(&parser, 0, sizeof(struct parser_t));
 //
 //    parser.tokens = tokens;
-//    parser.current_token = tokens;
+//    parser.cur_token = tokens;
 //
 //    parser.scope_stack_top = -1;
 //    parser.scope_stack = calloc(sizeof(struct scope_t *), SCOPE_MAX_DEPTH);
@@ -387,9 +418,9 @@ void parse_tokens(struct token_t *tokens)
 ////    link->type = types;
 ////    translate_type(link, 0);
 //
-//    while(parser.current_token->token_type != TOKEN_EOF)
+//    while(parser.cur_token->type != TOKEN_EOF)
 //    {
-////        if(is_type_specifier(parser.current_token))
+////        if(is_type_specifier(parser.cur_token))
 ////        {
 ////            types = (struct reference_type_t *)parse_declaration(&parser);
 ////        }
@@ -399,7 +430,7 @@ void parse_tokens(struct token_t *tokens)
 ////        }
 //
 //        //exp_16(&parser);
-//        if(is_declaration_specifier(parser.current_token))
+//        if(is_declaration_specifier(parser.cur_token))
 //        {
 //            parse_declaration(&parser, 0);
 //        }
@@ -412,54 +443,64 @@ void parse_tokens(struct token_t *tokens)
 //    pop_scope(&parser);
 }
 
+void error(uint32_t line, uint32_t column, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    printf("ERROR (%u : %u): ", line, column);
+    vprintf(format, args);
+    printf("\n");
+    exit(-1);
+}
+
 void parse(char *text)
 {
     struct parser_t parser = {};
     parser.tokens = lex_tokens(text);
-    advance_token(&parser);
-    push_scope(&parser);
+    // advance_token(&parser);
+    // push_scope(&parser);
 
-    parse_statement(&parser);
-
-    // parse_expression_statement(&parser);
-//    while(parser.current_token->token_type != TOKEN_EOF)
-//    {
-//
-//    }
-
-    pop_scope(&parser);
+    do
+    {
+        parse_statement(&parser);
+    }
+    while(parser.cur_token->type != TOKEN_EOF);
+    
+    // parse_statement(&parser);
+    // pop_scope(&parser);
 }
 
-struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_list)
+struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_list)
 {
-    struct base_type_t *type = NULL;
-    struct base_type_t *last_type = NULL;
+    // struct base_type_t *type = NULL;
+    // struct base_type_t *last_type = NULL;
 
-    struct base_type_t *specifiers_qualifiers = NULL;
-    struct base_type_t *last_specifier_qualifier = NULL;
+//     struct base_type_t *specifiers_qualifiers = NULL;
+//     struct base_type_t *last_specifier_qualifier = NULL;
 
-    struct base_type_t *new_type = NULL;
-    struct base_type_t *current_type = NULL;
-//    struct base_type_t *prev_type = NULL;
-    struct base_type_t *declarator = NULL;
-    struct base_type_t *temp_type = NULL;
+//     struct base_type_t *new_type = NULL;
+//     struct base_type_t *current_type = NULL;
+// //    struct base_type_t *prev_type = NULL;
+//     struct base_type_t *declarator = NULL;
+//     struct base_type_t *temp_type = NULL;
 
-    struct reference_type_t *params;
-    struct reference_type_t *next_param;
+//     struct reference_type_t *params;
+//     struct reference_type_t *next_param;
 
-    struct function_type_t *function_type;
+//     struct function_type_t *function_type;
 
-    struct object_t *object;
-    int old_function_style;
-    struct identifier_type_t *identifier;
-    struct token_t *next_token;
-    struct link_type_t *link = NULL;
-    struct link_type_t *prev_link;
-
+//     struct object_t *object;struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator_t *declarator);
+//     int old_function_style;
+//     struct identifier_type_t *identifier;
+//     struct token_t *next_token;
+//     struct link_type_t *link = NULL;
+//     struct link_type_t *prev_link;
+    struct declarator_t *declarators = NULL;
+    struct declarator_t *last_declarator = NULL;
     parser->declaration_depth++;
 
-
-    //if(is_type_specifier(parser->current_token))
+    in_arg_list = in_arg_list && 1;
+    //if(is_type_specifier(parser->cur_token))
     //{
     /* this is a declaration, which means
     we're expecting a bunch of type qualifiers,
@@ -491,230 +532,214 @@ struct base_type_t *parse_declaration(struct parser_t *parser, int is_in_arg_lis
 
     */
 
-    if(is_declaration_specifier(parser->current_token))
+    struct type_t *type = NULL;
+
+    if(is_declaration_specifier(parser->cur_token))
     {
-        while(is_declaration_specifier(parser->current_token))
+        struct decl_spec_t *specifiers = NULL;
+        struct decl_spec_t *last_specifier = NULL;
+        uint32_t found_type_specifiers = 0;
+
+        while(is_declaration_specifier(parser->cur_token))
         {
-            if(parser->current_token->token_name == TOKEN_KEYWORD_STRUCT ||
-               parser->current_token->token_name == TOKEN_KEYWORD_UNION)
+            struct decl_spec_t *specifier = calloc(1, sizeof(struct decl_spec_t));
+
+            specifier->specifier = decl_specifier_lut[parser->cur_token->name];
+
+            if(specifiers == NULL)
             {
-//                lookahead_token(&parser);
-//                next_token = parser->current_token->next;
-                advance_token(parser);
-                new_type = NULL;
-
-                if(parser->current_token->token_type == TOKEN_IDENTIFIER)
-                {
-                    /* we got an identifier after the struct keyword, so look
-                    for a type with this name */
-                    new_type = get_aggregate_type(parser, parser->current_token->constant.string_constant);
-//                    next_token = next_token->next;
-                    advance_token(parser);
-                }
-
-                if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
-                   parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
-                {
-                    if(new_type)
-                    {
-                        /* error: redefinition of aggregate type */
-                    }
-
-                    /* we're declaring a struct/union here */
-                    new_type = parse_aggregate_declaration(parser);
-                }
-                else
-                {
-                    /* error: expecting token '{' */
-                }
+                specifiers = specifier;
             }
             else
             {
-                new_type = calloc(sizeof(struct base_type_t), 1);
-                new_type->type = type_from_token(parser->current_token);
-                advance_token(parser);
+                last_specifier->next = specifier;
             }
 
-            if(!specifiers_qualifiers)
+            last_specifier = specifier;
+
+            if(specifier->specifier == DECL_SPEC_STRUCT || specifier->specifier == DECL_SPEC_UNION)
             {
-                specifiers_qualifiers = new_type;
+                if(found_type_specifiers)
+                {
+                    /* error: some tomfoolery going on with them specifiers... */
+                }
+
+                type = parse_aggregate_declaration(parser);
+
+                break;
             }
-            else
-            {
-                last_specifier_qualifier->next = new_type;
-            }
 
-            last_specifier_qualifier = new_type;
+            found_type_specifiers |= is_type_specifier(parser->cur_token);
+            advance_token(parser);
         }
-    }
-    else if(parser->current_token->token_type == TOKEN_IDENTIFIER)
-    {
-        /* this token is something other than any valid declaration
-        specifier, so test it to see if it's a typedef'd name */
-        if(is_typedef_name(parser->current_token))
+
+        if(type == NULL)
         {
+            type = calloc(1, sizeof(struct type_t));
+            type->type = TYPE_PRIMITIVE;
+        }
 
-        }
-        else
-        {
-            /* nope, not a typedef */
-            /* error: unknown type */
-        }
+        type->specifiers = specifiers;
     }
+    // else if(parser->cur_token->type == TOKEN_IDENTIFIER)
+    // {
+    //     /* this token is something other than any valid declaration
+    //     specifier, so test it to see if it's a typedef'd name */
+    //     if(is_typedef_name(parser->cur_token))
+    //     {
 
-    current_type = specifiers_qualifiers;
+    //     }
+    //     else
+    //     {
+    //         /* nope, not a typedef */
+    //         /* error: unknown type */
+    //     }
+    // }
 
+    // current_type = specifiers_qualifiers;
+    // uint32_t done = 0;
     while(1)
     {
         /* declarator: identifier, function, array, pointer, etc... */
-        declarator = parse_declarator(parser);
+        struct declarator_t *declarator = parse_declarator(parser, NULL);
 
-        if(declarator)
+        struct type_t *declarator_type = declarator->type;
+
+        if(declarator_type != NULL)
         {
-            /* got a declarator, which possibly have a lot of stuff linked,
-            so find the end of the declarator and append the declaration specifiers
-            we found */
-            temp_type = declarator;
-
-            while(temp_type->next)
+            while(declarator_type->next != NULL)
             {
-                temp_type = temp_type->next;
+                declarator_type = declarator_type->next;
             }
 
-            temp_type->next = specifiers_qualifiers;
-
-            current_type = declarator;
+            declarator_type->next = type;
         }
 
-        /* having a declarator here is not obligatory, given that this
-        code will be used to find out the type when the type-cast operator
-        gets used */
-
-        if(!parser->declaration_depth)
+        if(declarators == NULL)
         {
-            /* since identifiers gets treated as types for the sake
-            of implementation they'll alway will be the first element
-            in the list of a declaration (if present) */
-            if(current_type->type == TYPE_IDENTIFIER)
+            declarators = declarator;
+        }
+        else
+        {
+            last_declarator->next = declarator;
+        }
+
+        last_declarator = declarator;
+
+        if(parser->cur_token->type == TOKEN_PUNCTUATOR)
+        {
+            if(parser->cur_token->name == TOKEN_PUNCTUATOR_EQUAL)
             {
-                identifier = (struct identifier_type_t *)current_type;
-                temp_type = (struct base_type_t *)current_type->next;
-
-                switch(temp_type->type)
+                if(in_arg_list)
                 {
-                    case TYPE_FUNCTION:
-                        function_type = (struct function_type_t *)temp_type;
-                        link = function_type->args;
-
-                        if(function_type->arg_count)
-                        {
-                            if(function_type->old_style)
-                            {
-                                /* the param types are being specified after
-                                the declarator, so parse them... */
-                            }
-                        }
-
-                        if(parser->current_token->token_type == TOKEN_PUNCTUATOR)
-                        {
-                            switch(parser->current_token->token_name)
-                            {
-                                case TOKEN_PUNCTUATOR_SEMICOLON:
-                                    advance_token(parser);
-                                break;
-
-                                case TOKEN_PUNCTUATOR_OBRACE:
-                                    /* function body... */
-
-                                   // parse_compound_statement(parser, )
-                                break;
-
-                                default:
-                                    /* everything else is wrong... */
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            /* everything else is wrong... */
-                        }
-
-                    break;
-
-                    default:
-                        object = get_object(parser, identifier->identifier);
-
-                        if(!object || (object->scope != parser->current_scope))
-                        {
-                            /* an object with the current name already exists,
-                            but it's declared in a different scope, so creating
-                            another object with the same name in this scope isn't
-                            considered duplication... */
-                            create_object(parser, current_type);
-                        }
-                        else
-                        {
-                            /* error: duplicate object... */
-                        }
-                    break;
+                    /* error: can't assign to function parameter */
+                    error(parser->cur_token->line, parser->cur_token->column, "Can't assign to function parameter");
                 }
-
+                /* handle assignment */
             }
-        }
 
-        if(!is_in_arg_list)
-        {
-            if(parser->current_token->token_type == TOKEN_PUNCTUATOR)
+            if(parser->cur_token->name == TOKEN_PUNCTUATOR_COMMA)
             {
-                if(parser->current_token->token_name == TOKEN_PUNCTUATOR_ASSIGN)
+                if(in_arg_list)
                 {
-                    /* deal with assignment, call the expression routines... */
+                    /* we're currently parsing the argument list of a function. However, paramaters need to 
+                    have a full declaration, and so we need to gtfo here so the caller can handle the ',' token
+                    and call us again, so we can apply the parsing for an entire declaration. */
+                    break;
                 }
-
-                if(parser->current_token->token_name == TOKEN_PUNCTUATOR_SEMICOLON)
+                else
                 {
                     advance_token(parser);
-                    break;
+
+                    // if(is_declaration_specifier(parser->cur_token))
+                    if(parser->cur_token->type != TOKEN_IDENTIFIER && !is_type_qualifier(parser->cur_token))
+                    {
+                        error(parser->cur_token->line, parser->cur_token->column, "Expected declarator");
+                    }
                 }
             }
+            else if(!in_arg_list && parser->cur_token->name == TOKEN_PUNCTUATOR_SEMICOLON)
+            {
+                /* end of declaration */
+                advance_token(parser);
+                if(declarator->type != NULL && declarator->type->type == TYPE_FUNCTION)
+                {
+                    declarator->type->func.prototype = 1;
+                }
+                break;
+            }
+            else if(in_arg_list && parser->cur_token->name == TOKEN_PUNCTUATOR_CPARENTHESIS)
+            {
+                /* end of function parameter list */
+                break;
+            }
+            else if(parser->cur_token->name == TOKEN_PUNCTUATOR_OBRACE)
+            {
+                /* function body */
+                break;
+            }
             else
             {
-                /* error: expecting '=', ',' or ';'... */
-            }
-
-            if(parser->current_token->token_name == TOKEN_PUNCTUATOR_COMMA)
-            {
-                specifiers_qualifiers = copy_type(specifiers_qualifiers);
-            }
-            else
-            {
-                /* error: some non-sense going on... */
+                /* error: expecting ',', ';' or '=' */
             }
         }
 
-        advance_token(parser);
+
+        // if(!is_in_arg_list)
+        // {
+        //     if(parser->cur_token->type == TOKEN_PUNCTUATOR)
+        //     {
+        //         if(parser->cur_token->name == TOKEN_PUNCTUATOR_ASSIGN)
+        //         {
+        //             /* deal with assignment, call the expression routines... */
+        //         }
+
+        //         if(parser->cur_token->name == TOKEN_PUNCTUATOR_SEMICOLON)
+        //         {
+        //             advance_token(parser);
+        //             break;
+        //         }
+        //     }
+        //     else
+        //     {
+        //         /* error: expecting '=', ',' or ';'... */
+        //     }
+
+        //     if(parser->cur_token->name == TOKEN_PUNCTUATOR_COMMA)
+        //     {
+        //         specifiers_qualifiers = copy_type(specifiers_qualifiers);
+        //     }
+        //     else
+        //     {
+        //         /* error: some non-sense going on... */
+        //     }
+        // }
+
+        // advance_token(parser);
     }
+
+    // if(declarator)
 
 
     parser->declaration_depth--;
 
-    return current_type;
+    return declarators;
 }
 
-struct base_type_t *parse_declarator(struct parser_t *parser)
+struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator_t *declarator)
 {
-    struct base_type_t *type = NULL;
-    struct base_type_t *ret_declarator = NULL;
-    struct base_type_t *temp = NULL;
-    struct base_type_t *new_type = NULL;
+    // struct base_type_t *type = NULL;
+    // struct base_type_t *ret_declarator = NULL;
+    // struct base_type_t *temp = NULL;
+    // struct base_type_t *new_type = NULL;
 
-    struct function_type_t *function_type = NULL;
-    struct array_type_t *array_type = NULL;
-    struct base_type_t *pointer_type = NULL;
-    struct identifier_type_t *identifier = NULL;
-    struct link_type_t *params_or_fields = NULL;
-    struct link_type_t *param_or_field = NULL;
-    struct link_type_t *last_param_or_field = NULL;
+    // struct function_type_t *function_type = NULL;
+    // struct array_type_t *array_type = NULL;
+    // struct base_type_t *pointer_type = NULL;
+    // struct identifier_type_t *identifier = NULL;
+    // struct link_type_t *params_or_fields = NULL;
+    // struct link_type_t *param_or_field = NULL;
+    // struct link_type_t *last_param_or_field = NULL;
 
     /*
         A declarator is defined as:
@@ -817,27 +842,55 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
     */
 
 
-//    if(is_type_specifier(parser->current_token))
+//    if(is_type_specifier(parser->cur_token))
 //    {
 //        /* welp, this is an error... */
 //    }
 
+    if(declarator == NULL)
+    {
+        declarator = calloc(1, sizeof(struct declarator_t ));
+    }
+
+    struct type_t *type = NULL;
 
     /* optional pointer before the direct-declarator... */
-    if(parser->current_token->token_type == TOKEN_PUNCTUATOR)
+    if(parser->cur_token->type == TOKEN_PUNCTUATOR)
     {
-        if(parser->current_token->token_name == TOKEN_PUNCTUATOR_ASTERISC)
+        if(parser->cur_token->name == TOKEN_PUNCTUATOR_ASTERISC)
         {
-            while(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
-                  parser->current_token->token_name == TOKEN_PUNCTUATOR_ASTERISC)
+            type = calloc(1, sizeof(struct type_t));
+            declarator->type = type;
+            type->type = TYPE_POINTER;
+            while(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_ASTERISC)
             {
-                new_type = calloc(1, sizeof(struct base_type_t));
-                new_type->type = TYPE_POINTER;
+                struct pointer_t *pointer = calloc(1, sizeof(struct pointer_t));
 
-                new_type->next = pointer_type;
-                pointer_type = new_type;
+                if(type->pointer == NULL)
+                {
+                    type->pointer = pointer;
+                }
+                else
+                {
+                    type->last_pointer->next = pointer;
+                }
 
-                advance_token(parser);
+                type->last_pointer = pointer;
+
+                while(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_ASTERISC)
+                {
+                    pointer->count++;
+                    advance_token(parser);
+                }
+
+                while(is_type_qualifier(parser->cur_token))
+                {
+                    struct decl_spec_t *qualifier = calloc(1, sizeof(struct decl_spec_t));
+                    qualifier->specifier = decl_specifier_lut[parser->cur_token->name];
+                    qualifier->next = pointer->qualifiers;
+                    pointer->qualifiers = qualifier;
+                    advance_token(parser);
+                }
             }
         }
         else
@@ -853,37 +906,51 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
     /* direct-declarator: can be an identifier, an
     declarator enclosed in parenthesis, or
     an direct-declarator... */
-    switch(parser->current_token->token_type)
+    switch(parser->cur_token->type)
     {
         case TOKEN_IDENTIFIER:
-            identifier = calloc(sizeof(struct identifier_type_t), 1);
-
-            identifier->base.next = NULL;
-            identifier->base.type = TYPE_IDENTIFIER;
-            identifier->identifier = parser->current_token->constant.string_constant;
-
+            declarator->identifier = strdup(parser->cur_token->constant.string_constant);
             advance_token(parser);
         break;
 
         case TOKEN_PUNCTUATOR:
-            if(parser->current_token->token_name == TOKEN_PUNCTUATOR_OPARENTHESIS)
+            if(parser->cur_token->name == TOKEN_PUNCTUATOR_OPARENTHESIS)
             {
+                /* declarator is inside parenthesis, which means anything inside of it has precedence. If
+                there are any '*', for example, the declarator will have pointer to something type */
                 advance_token(parser);
-                ret_declarator = parse_declarator(parser);
+                struct type_t *next_type = declarator->type;
+                declarator->type = NULL;
+                parse_declarator(parser, declarator);
 
-                if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
-                   parser->current_token->token_name == TOKEN_PUNCTUATOR_CPARENTHESIS)
+                if(declarator->type != NULL)
+                {
+                    /* there was '*' and type qualifiers inside the parenthesis, so the declarator type
+                    is now pointer to whatever we find when we reach the end of this call */
+                    struct type_t *last_type = declarator->type;
+
+                    while(last_type->next)
+                    {
+                        last_type = last_type->next;
+                    }
+
+                    last_type->next = next_type;
+                }
+
+                if(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_CPARENTHESIS)
                 {
                     advance_token(parser);
                 }
                 else
                 {
-                    /* everything else is wrong... */
+                    /* error: expecting ')' */
+                    error(parser->cur_token->line, parser->cur_token->column, "Expecting '(' token");
                 }
             }
             else
             {
                 /* everything else is wrong... */
+                error(parser->cur_token->line, parser->cur_token->column, "Everything else is wrong");
             }
         break;
     }
@@ -892,83 +959,82 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
 
 
 
-    if(parser->current_token->token_type == TOKEN_PUNCTUATOR)
+    if(parser->cur_token->type == TOKEN_PUNCTUATOR)
     {
+        // if(declarator->type == NULL)
+        // {
+        //     declarator->type = calloc(1, sizeof(struct type_t));
+        //     type = declarator->type;
+        // }
+
+        struct type_t temp_type = {.type = TYPE_UNKNOWN};
+
+        // struct type_t *type = declarator->type;
         /* this declarator may be a function or an array... */
-        switch(parser->current_token->token_name)
+        switch(parser->cur_token->name)
         {
             case TOKEN_PUNCTUATOR_OPARENTHESIS:
-
-                function_type = calloc(sizeof(struct function_type_t), 1);
-                function_type->base.next = NULL;
-                function_type->base.type = TYPE_FUNCTION;
-
+                temp_type.type = TYPE_FUNCTION;
                 /* ( */
                 advance_token(parser);
 
                 /* this is the parameter list of a function, which means we'll be
                 possibly declaring other identifiers, so we call the declaration
                 parsing routine here...*/
-
-                params_or_fields = NULL;
-                last_param_or_field = NULL;
-
-                /*if(parser->current_token->token_type != TOKEN_PUNCTUATOR ||
-                   parser->current_token->token_name != TOKEN_PUNCTUATOR_CPARENTHESIS)
-                {*/
                 //parser->param_list_level++;
 
-                function_type->args = 0;
+                // function_type->args = 0;
+                temp_type.func.arg_count = 0;
+
+                struct declarator_t *args = NULL;
+                struct declarator_t *last_arg = NULL;
 
                 while(1)
                 {
-                    /* parser parameter-list... */
-                    new_type = parse_declaration(parser, 1);
+                    /* parse parameter-list... */
+                    struct declarator_t *arg = parse_declaration(parser, 1);
 
-                    if(new_type)
+                    if(arg)
                     {
-                        function_type->arg_count++;
+                        temp_type.func.arg_count++;
 
-                        param_or_field = calloc(sizeof(struct link_type_t), 1);
-                        param_or_field->type = new_type;
-
-                        if(!params_or_fields)
+                        if(args == NULL)
                         {
-                            params_or_fields = param_or_field;
+                            args = arg;
                         }
                         else
                         {
-                            last_param_or_field->base.next = (struct base_type_t *)param_or_field;
+                            last_arg->next = arg;
                         }
 
-                        last_param_or_field = param_or_field;
+                        last_arg = arg;
                     }
 
-                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR)
+                    if(parser->cur_token->type == TOKEN_PUNCTUATOR)
                     {
-                        switch(parser->current_token->token_name)
+                        if(parser->cur_token->name == TOKEN_PUNCTUATOR_CPARENTHESIS)
                         {
-                            case TOKEN_PUNCTUATOR_CPARENTHESIS:
-                                /* end of the argument list... */
-                                break;
                             break;
+                        }
+                        else if(parser->cur_token->name == TOKEN_PUNCTUATOR_COMMA)
+                        {
+                            advance_token(parser);
 
-                            case TOKEN_PUNCTUATOR_COMMA:
-                                /* , */
-                                advance_token(parser);
-                            break;
-
-                            default:
-                                /* error: unexpected token. Expecting ')' or ','... */
-                            break;
+                            if(!is_declaration_specifier(parser->cur_token))
+                            {
+                                /* function parameters require declaration specifiers */
+                                error(parser->cur_token->line, parser->cur_token->column, "Expecting declaration specifiers");
+                            }
+                        }
+                        else
+                        {
+                            /* error: unexpected token. Expecting ')' or ','... */
+                            error(parser->cur_token->line, parser->cur_token->column, "Unexpected token. Expecting ')' or','");
                         }
                     }
                 }
 
-                //parser->param_list_level--;
-                //}
-
-                function_type->args = params_or_fields;
+                temp_type.func.args = args;
 
                 /* ) */
                 advance_token(parser);
@@ -1030,7 +1096,7 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
             break;
 
             case TOKEN_PUNCTUATOR_OBRACKET:
-                array_type = calloc(sizeof(struct array_type_t), 1);
+                // array_type = calloc(sizeof(struct array_type_t), 1);
 
                 /* [... */
                 advance_token(parser);
@@ -1039,6 +1105,33 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
             default:
                 /* anything else is wrong... */
             break;
+        }
+
+        if(temp_type.type != TYPE_UNKNOWN)
+        {
+            if(type == NULL)
+            {
+                declarator->type = calloc(1, sizeof(struct type_t));
+                type = declarator->type;
+            }
+
+            type->type = temp_type.type;
+
+            switch(temp_type.type)
+            {
+                case TYPE_STRUCT:
+                case TYPE_UNION:
+                    type->aggregate = temp_type.aggregate;
+                break;
+
+                case TYPE_ARRAY:
+                    type->array = temp_type.array;
+                break;
+
+                case TYPE_FUNCTION:
+                    type->func = temp_type.func;
+                break;
+            }
         }
     }
     else
@@ -1049,190 +1142,237 @@ struct base_type_t *parse_declarator(struct parser_t *parser)
 
 
 
-    if(function_type)
-    {
-        type = (struct base_type_t *) function_type;
+    // if(function_type)
+    // {
+    //     type = (struct base_type_t *) function_type;
 
-        if(pointer_type)
-        {
-            /* function that returns pointer to... */
-            function_type->base.next = pointer_type;
-        }
-    }
-    else
-    {
-        /* pointer to... */
-        type = pointer_type;
-    }
+    //     if(pointer_type)
+    //     {
+    //         /* function that returns pointer to... */
+    //         function_type->base.next = pointer_type;
+    //     }
+    // }
+    // else
+    // {
+    //     /* pointer to... */
+    //     type = pointer_type;
+    // }
 
-    if(identifier)
-    {
-        /* identifier is a function/array of/pointer to/nothing... */
-        identifier->base.next = type;
-        type = (struct base_type_t *)identifier;
-    }
+    // if(identifier)
+    // {
+    //     /* identifier is a function/array of/pointer to/nothing... */
+    //     identifier->base.next = type;
+    //     type = (struct base_type_t *)identifier;
+    // }
 
-    if(ret_declarator)
-    {
-        temp = ret_declarator;
+    // if(ret_declarator)
+    // {
+    //     temp = ret_declarator;
 
-        while(temp)
-        {
-            /* we skip until the end of the list, since we'll be
-            appending what we found in this call to what was
-            found in the recursive call.
+    //     while(temp)
+    //     {
+    //         /* we skip until the end of the list, since we'll be
+    //         appending what we found in this call to what was
+    //         found in the recursive call.
 
-            If this is a function, the last element of the list will
-            be the function type, since its return type is kept in the
-            next pointer, and up to this point we still don't know its
-            return type (since it was found in the current call)... */
-            temp = temp->next;
-        }
+    //         If this is a function, the last element of the list will
+    //         be the function type, since its return type is kept in the
+    //         next pointer, and up to this point we still don't know its
+    //         return type (since it was found in the current call)... */
+    //         temp = temp->next;
+    //     }
 
-        switch(temp->type)
-        {
-            case TYPE_FUNCTION:
+    //     switch(temp->type)
+    //     {
+    //         case TYPE_FUNCTION:
 
-                if(function_type)
-                {
-                    /* error: function returning function... */
-                }
+    //             if(function_type)
+    //             {
+    //                 /* error: function returning function... */
+    //             }
 
-                if(array_type)
-                {
-                    /* error: function returning array... */
-                }
+    //             if(array_type)
+    //             {
+    //                 /* error: function returning array... */
+    //             }
 
-                function_type = (struct function_type_t *)temp;
+    //             function_type = (struct function_type_t *)temp;
 
-            break;
-        }
+    //         break;
+    //     }
 
-        temp->next = type;
+    //     temp->next = type;
 
-        type = ret_declarator;
-    }
+    //     type = ret_declarator;
+    // }
 
-    return type;
+    return declarator;
 }
 
 
-struct base_type_t *parse_aggregate_declaration(struct parser_t *parser)
+struct type_t *parse_aggregate_declaration(struct parser_t *parser)
 {
-    struct aggretage_type_t *type;
+    // struct type_t *type;
 
-    struct base_type_t *field_type = NULL;
-    struct link_type_t *field = NULL;
-    struct link_type_t *fields = NULL;
-    struct link_type_t *last_field = NULL;
+    // struct base_type_t *field_type = NULL;
+    // struct link_type_t *field = NULL;
+    // struct link_type_t *fields = NULL;
+    // struct link_type_t *last_field = NULL;
 
-    type = calloc(sizeof(struct aggretage_type_t), 1);
+    struct type_t *type = calloc(sizeof(struct type_t), 1);
+    type->type = type_specifier_from_token(parser->cur_token);
 
-    if(parser->current_token->token_type == TOKEN_KEYWORD)
-    {
-        switch(parser->current_token->token_name)
-        {
-            case TOKEN_KEYWORD_STRUCT:
-                type->base.type = TYPE_STRUCT;
-            break;
+    // switch(specifier)
+    // {
+    //     case DECL_SPEC_STRUCT:
 
-            case TOKEN_KEYWORD_UNION:
-                type->base.type = TYPE_UNION;
-            break;
-        }
-    }
-    else
-    {
-        /* everything else is wrong... */
-    }
+    //     break;
+
+    //     case DECL_SPEC_UNION:
+
+    //     break;
+    // }
+
+    // if(parser->cur_token->type == TOKEN_KEYWORD)
+    // {
+    //     switch(parser->cur_token->name)
+    //     {
+    //         case TOKEN_KEYWORD_STRUCT:
+    //             type->base.type = TYPE_STRUCT;
+    //         break;
+
+    //         case TOKEN_KEYWORD_UNION:
+    //             type->base.type = TYPE_UNION;
+    //         break;
+    //     }
+    // }
+    // else
+    // {
+    //     /* everything else is wrong... */
+    // }
 
     advance_token(parser);
 
-    if(parser->current_token->token_type == TOKEN_IDENTIFIER)
+    if(parser->cur_token->type == TOKEN_IDENTIFIER)
     {
-        type->name = strdup(parser->current_token->constant.string_constant);
+        type->aggregate.identifier = strdup(parser->cur_token->constant.string_constant);
         advance_token(parser);
     }
 
-
-    if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
-       parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
+    if(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_OBRACE)
     {
         /* struct/union (identifier) { ... */
         advance_token(parser);
 
+        struct declarator_t *fields = NULL;
+        struct declarator_t *last_field = NULL;
+
         while(1)
         {
             /* parse the fields, which can be structs as well */
-            field_type = parse_declaration(parser, 0);
+            struct declarator_t *field = parse_declaration(parser, 0);
+            // struct type_t *last_field = field;
 
-            field = calloc(sizeof(struct link_type_t ), 1);
-
-            field->type = field_type;
-            field->base.type = TYPE_LINK;
-            field->base.next = NULL;
-
-            if(!fields)
+            if(fields == NULL)
             {
                 fields = field;
             }
             else
             {
-                last_field->base.next = (struct base_type_t *)field;
+                last_field->next = field;
+            }
+
+            while(field->next != NULL)
+            {
+                field = field->next;
+                type->aggregate.field_count++;
             }
 
             last_field = field;
 
-            if(parser->current_token->token_type == TOKEN_PUNCTUATOR &&
-               parser->current_token->token_name == TOKEN_PUNCTUATOR_CBRACE)
+            if(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_CBRACE)
             {
                 advance_token(parser);
                 break;
             }
         }
 
-        type->fields = fields;
+        type->aggregate.fields = fields;
     }
 
-    if(type->name)
+    if(type->aggregate.identifier != NULL)
     {
         /* this aggregate type has a tag, so we stash it... */
-        stash_aggregate_type(parser, type);
+        // stash_aggregate_type(parser, type);
     }
 
-    return (struct base_type_t *)type;
+    return type;
 }
 
 void parse_statement(struct parser_t *parser)
 {
     struct token_t *token;
 
-    switch(parser->current_token->token_type)
+    if(parser->current_scope == NULL)
+    {
+        parse_compound_statement(parser);
+    }
+    else if(parser->cur_token->type == TOKEN_IDENTIFIER)
+    {
+        if(parser->next_token->type == TOKEN_PUNCTUATOR && parser->next_token->type == TOKEN_PUNCTUATOR_COLON)
+        {
+            parse_labeled_statement(parser);
+        }
+    }
+    else if(parser->cur_token->type == TOKEN_KEYWORD)
+    {
+        if(parser->cur_token->name == TOKEN_KEYWORD_CASE || parser->cur_token->name == TOKEN_KEYWORD_DEFAULT)
+        {
+            parse_labeled_statement(parser);
+        }
+    }
+    else if(parser->cur_token->type == TOKEN_PUNCTUATOR)
+    {
+        switch(parser->cur_token->name)
+        {
+            case TOKEN_PUNCTUATOR_OBRACE:
+                parse_compound_statement(parser);
+            break;
+        }
+    }
+}
+
+void parse_labeled_statement(struct parser_t *parser)
+{
+    switch(parser->cur_token->type)
     {
         case TOKEN_IDENTIFIER:
         {
-            /* label */
             advance_token(parser);
-            if(parser->current_token->token_type == TOKEN_PUNCTUATOR && parser->current_token->token_name == TOKEN_PUNCTUATOR_COLON)
+            if(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_COLON)
             {
                 /* create label */
                 advance_token(parser);
                 parse_statement(parser);
+            }
+            else
+            {
+                /* error: expecting ':' after identifier */
             }
         }
         break;
 
         case TOKEN_KEYWORD:
         {
-            switch(parser->current_token->token_name)
+            switch(parser->cur_token->name)
             {
                 case TOKEN_KEYWORD_CASE:
                     advance_token(parser);
-                    if(parser->current_token->token_type == TOKEN_CONSTANT)
+                    if(parser->cur_token->type == TOKEN_CONSTANT)
                     {
                         advance_token(parser);
 
-                        if(parser->current_token->token_type == TOKEN_PUNCTUATOR && parser->current_token->token_name == TOKEN_PUNCTUATOR_COLON)
+                        if(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_COLON)
                         {
                             advance_token(parser);
                             /* create case */
@@ -1243,95 +1383,20 @@ void parse_statement(struct parser_t *parser)
 
                 case TOKEN_KEYWORD_DEFAULT:
                 {
-                    
+                    advance_token(parser);
+
+                    if(parser->cur_token->type == TOKEN_PUNCTUATOR && parser->cur_token->name == TOKEN_PUNCTUATOR_COLON)
+                    {
+                        /* default case */
+                        advance_token(parser);
+                        parse_statement(parser);
+                    }
                 }
                 break;
             }
         }
         break;
     }
-
-//    switch(parser->current_token->token_type)
-//    {
-//        case TOKEN_KEYWORD:
-//            switch(parser->current_token->token_name)
-//            {
-//                case TOKEN_KEYWORD_IF:
-//                    /* if statement... */
-//
-//                    /* 'if' */
-//                    advance_token(parser);
-//
-//                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
-//                       parser->current_token->token_name == TOKEN_PUNCTUATOR_OPARENTHESIS)
-//                    {
-//
-//                        /* parse expression here... */
-//
-//                        if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
-//                           parser->current_token->token_name == TOKEN_PUNCTUATOR_CPARENTHESIS)
-//                        {
-//                            /* ')' */
-//                            advance_token(parser);
-//                        }
-//                        else
-//                        {
-//                            /* error: expecting token ')'... */
-//                        }
-//                    }
-//                    else
-//                    {
-//                        /* error: expecting token '('... */
-//                    }
-//                break;
-//
-//                case TOKEN_KEYWORD_SWITCH:
-//                    /* switch statement... */
-//
-//                    /* 'switch' */
-//                    advance_token(parser);
-//
-//                    if(parser->current_token->token_type == TOKEN_PUNCTUATOR ||
-//                       parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
-//                    {
-//
-//                        /* parse compound statement here. The compound statement parsing
-//                        routine will already skip '{' and '}'... */
-//                    }
-//                    else
-//                    {
-//                        /* error: expecting token '{'... */
-//                    }
-//
-//                break;
-//
-//                case TOKEN_KEYWORD_FOR:
-//                case TOKEN_KEYWORD_WHILE:
-//                case TOKEN_KEYWORD_DO:
-//
-//                    /* for/while/do... */
-//                    advance_token(parser);
-//
-//                break;
-//
-//
-//                default:
-//                    /* everything else is wrong... */
-//                break;
-//            }
-//        break;
-//
-//        case TOKEN_PUNCTUATOR:
-//            if(parser->current_token->token_name == TOKEN_PUNCTUATOR_OBRACE)
-//            {
-//               /* compound statement... */
-//            }
-//            else
-//            {
-//                /* error: */
-//            }
-//        break;
-//    }
 }
 
 void parse_compound_statement(struct parser_t *parser)
@@ -1341,13 +1406,35 @@ void parse_compound_statement(struct parser_t *parser)
     /* {... */
     advance_token(parser);
 
-    while(parser->current_token->token_type != TOKEN_PUNCTUATOR ||
-          parser->current_token->token_name != TOKEN_PUNCTUATOR_CBRACE)
+    while((parser->cur_token->type != TOKEN_PUNCTUATOR || parser->cur_token->name != TOKEN_PUNCTUATOR_CBRACE) && 
+            parser->cur_token->type != TOKEN_EOF)
     {
-        advance_token(parser);
+        if(is_declaration_specifier(parser->cur_token))
+        {
+            struct declarator_t *declarator = parse_declaration(parser, 0);
+
+            if(declarator->type->type == TYPE_FUNCTION)
+            {
+
+            }
+        }
+        else
+        {
+            parse_statement(parser);
+        }
     }
 
     pop_scope(parser);
+
+    if(parser->current_scope != NULL)
+    {
+        if(parser->cur_token->type != TOKEN_PUNCTUATOR || parser->cur_token->name != TOKEN_PUNCTUATOR_CBRACE)
+        {
+            /* error: expecting '}' */
+        }
+
+        advance_token(parser);
+    }
 }
 
 
@@ -1377,116 +1464,116 @@ void parse_expression_statement(struct parser_t *parser)
 
 void translate_type(struct link_type_t *type, int single_reference)
 {
-    struct identifier_type_t *identifier;
-    struct function_type_t *function;
-    struct link_type_t *param_or_field;
-    struct base_type_t *base_type;
-    struct aggretage_type_t *aggretage_type;
+    // struct identifier_type_t *identifier;
+    // struct function_type_t *function;
+    // struct link_type_t *param_or_field;
+    // struct base_type_t *base_type;
+    // struct aggretage_type_t *aggretage_type;
 
-    while(type)
-    {
-        base_type = type->type;
+    // while(type)
+    // {
+    //     base_type = type->type;
 
-        while(base_type)
-        {
-            switch(base_type->type)
-            {
-                case TYPE_IDENTIFIER:
-                    identifier = (struct identifier_type_t *)base_type;
-                    printf("[%s] is ", identifier->identifier);
-                break;
+    //     while(base_type)
+    //     {
+    //         switch(base_type->type)
+    //         {
+    //             case TYPE_IDENTIFIER:
+    //                 identifier = (struct identifier_type_t *)base_type;
+    //                 printf("[%s] is ", identifier->identifier);
+    //             break;
 
-                case TYPE_POINTER:
-                    printf("a pointer to ");
-                break;
+    //             case TYPE_POINTER:
+    //                 printf("a pointer to ");
+    //             break;
 
-                case TYPE_FUNCTION:
-                    function = (struct function_type_t *)base_type;
+    //             case TYPE_FUNCTION:
+    //                 function = (struct function_type_t *)base_type;
 
-                    printf("a function (");
+    //                 printf("a function (");
 
-                    param_or_field = function->args;
+    //                 param_or_field = function->args;
 
-                    while(param_or_field)
-                    {
-                        translate_type(param_or_field, 1);
+    //                 while(param_or_field)
+    //                 {
+    //                     translate_type(param_or_field, 1);
 
-                        param_or_field = (struct link_type_t *)param_or_field->base.next;
+    //                     param_or_field = (struct link_type_t *)param_or_field->base.next;
 
-                        if(param_or_field)
-                        {
-                            printf(", ");
-                        }
-                    }
+    //                     if(param_or_field)
+    //                     {
+    //                         printf(", ");
+    //                     }
+    //                 }
 
-                    printf("), returning ");
-                break;
+    //                 printf("), returning ");
+    //             break;
 
-                case TYPE_STRUCT:
-                    aggretage_type = (struct aggretage_type_t *)base_type;
+    //             case TYPE_STRUCT:
+    //                 aggretage_type = (struct aggretage_type_t *)base_type;
 
-                    if(aggretage_type->name)
-                    {
-                        printf("a struct [%s] {", aggretage_type->name);
-                    }
-                    else
-                    {
-                        printf("an anonymous struct {");
-                    }
+    //                 if(aggretage_type->name)
+    //                 {
+    //                     printf("a struct [%s] {", aggretage_type->name);
+    //                 }
+    //                 else
+    //                 {
+    //                     printf("an anonymous struct {");
+    //                 }
 
-                    param_or_field = aggretage_type->fields;
+    //                 param_or_field = aggretage_type->fields;
 
-                    while(param_or_field)
-                    {
-                        translate_type(param_or_field, 1);
+    //                 while(param_or_field)
+    //                 {
+    //                     translate_type(param_or_field, 1);
 
-                        param_or_field = (struct link_type_t *)param_or_field->base.next;
+    //                     param_or_field = (struct link_type_t *)param_or_field->base.next;
 
-                        if(param_or_field)
-                        {
-                            printf(", ");
-                        }
-                    }
+    //                     if(param_or_field)
+    //                     {
+    //                         printf(", ");
+    //                     }
+    //                 }
 
-                    printf("}, ");
+    //                 printf("}, ");
 
 
-                break;
+    //             break;
 
-                case TYPE_INT:
-                    printf("an int");
-                break;
+    //             case TYPE_INT:
+    //                 printf("an int");
+    //             break;
 
-                case TYPE_FLOAT:
-                    printf("a float");
-                break;
+    //             case TYPE_FLOAT:
+    //                 printf("a float");
+    //             break;
 
-                case TYPE_DOUBLE:
-                    printf("a double");
-                break;
+    //             case TYPE_DOUBLE:
+    //                 printf("a double");
+    //             break;
 
-                case TYPE_VOID:
-                    printf("void");
-                break;
+    //             case TYPE_VOID:
+    //                 printf("void");
+    //             break;
 
-                case TYPE_SHORT:
-                    printf("a short");
-                break;
+    //             case TYPE_SHORT:
+    //                 printf("a short");
+    //             break;
 
-                case TYPE_CHAR:
-                    printf("a char");
-                break;
+    //             case TYPE_CHAR:
+    //                 printf("a char");
+    //             break;
 
-                default:
-                    return;
-                break;
-            }
+    //             default:
+    //                 return;
+    //             break;
+    //         }
 
-            base_type = base_type->next;
-        }
+    //         base_type = base_type->next;
+    //     }
 
-        type = single_reference ? NULL : (struct link_type_t *)type->base.next;
-    }
+    //     type = single_reference ? NULL : (struct link_type_t *)type->base.next;
+    // }
 }
 
 
