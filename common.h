@@ -154,7 +154,12 @@ enum TOKEN_KEYWORD
 
 union constant_t
 {
-    char *string_constant;
+    struct
+    {
+        char *string_constant;
+        uint32_t string_length;
+    };
+    
     uint64_t int_constant;
     double float_constant;
 };
@@ -214,12 +219,25 @@ enum DECL_SPEC
     DECL_SPEC_UNKNOWN,
 };
 
-enum TYPE_QUALIFIER
-{
-    TYPE_QUALIFIER_CONST,
-    TYPE_QUALIFIER_RESTRICT,
-    TYPE_QUALIFIER_VOLATILE,
-};
+#define PRIMITIVE_TYPE_SPEC_MASK ((1 << DECL_SPEC_INT)      |\
+                                  (1 << DECL_SPEC_SHORT)    |\
+                                  (1 << DECL_SPEC_CHAR)     |\
+                                  (1 << DECL_SPEC_FLOAT)    |\
+                                  (1 << DECL_SPEC_DOUBLE)   |\
+                                  (1 << DECL_SPEC_LONG)     |\
+                                  (1 << DECL_SPEC_UNSIGNED) |\
+                                  (1 << DECL_SPEC_SIGNED))    
+
+#define AGGREGATE_TYPE_SPEC_MASK ((1 << DECL_SPEC_STRUCT) | (1 << DECL_SPEC_UNION))
+
+#define STORAGE_CLASS_SPEC_MASK ((1 << DECL_SPEC_EXTERN) | (1 << DECL_SPEC_STATIC) | (1 << DECL_SPEC_AUTO) | (1 << DECL_SPEC_REGISTER))
+
+// enum TYPE_QUALIFIER
+// {
+//     TYPE_QUALIFIER_CONST,
+//     TYPE_QUALIFIER_RESTRICT,
+//     TYPE_QUALIFIER_VOLATILE,
+// };
 
 struct decl_spec_t
 {
@@ -251,15 +269,20 @@ struct declarator_t;
 struct type_t 
 {
     struct type_t *         next;
-    struct decl_spec_t *    specifiers;
+    // struct decl_spec_t *    specifiers;
+    uint32_t                specifiers;
     struct pointer_t *      pointer;
     struct pointer_t *      last_pointer;
+
     uint32_t                type;
+    uint32_t                complete;
 
     union
     {
         struct 
         { 
+            /* used by the parser to store defined types */
+            struct type_t *         stored_next;
             /* used for struct/union tags and field names */
             char *                  identifier;
             struct declarator_t *   fields; 
@@ -351,12 +374,78 @@ struct typedef_type_t
 
 enum EXP_NODE_TYPE
 {
-    EXP_NODE_TYPE_PRIMARY = 1,
-    EXP_NODE_TYPE_POSTFIX = 1 << 1,
-    EXP_NODE_TYPE_UNARY = 1 << 2,
-    EXP_NODE_TYPE_MULTIPLICATIVE = 1 << 3,
-    EXP_NODE_TYPE_ADDITIVE = 1 << 4,
+    EXP_NODE_TYPE_PRIMARY           = 1,
+    EXP_NODE_TYPE_POSTFIX           = 1 << 1,
+    EXP_NODE_TYPE_UNARY             = 1 << 2,
+    EXP_NODE_TYPE_MULTIPLICATIVE    = 1 << 3,
+    EXP_NODE_TYPE_ADDITIVE          = 1 << 4,
+    EXP_NODE_TYPE_SHIFT             = 1 << 5,
     EXP_NODE_TYPE_END,
+};
+
+enum PRIMARY_EXP_NODE_TYPE
+{
+    PRIMARY_EXP_NODE_TYPE_IDENTIFIER = 0,
+    PRIMARY_EXP_NODE_TYPE_STRING_LITERAL,
+    PRIMARY_EXP_NODE_TYPE_INTEGER_CONSTANT,
+    PRIMARY_EXP_NODE_TYPE_EXPRESSION,
+};
+
+enum POSTFIX_EXP_NODE_TYPE
+{
+    POSTFIX_EXP_NODE_TYPE_FUNC_CALL = 0,
+    POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX,
+    POSTFIX_EXP_NODE_TYPE_INCREMENT,
+    POSTFIX_EXP_NODE_TYPE_DECREMENT,
+    POSTFIX_EXP_NODE_TYPE_ARROW,
+    POSTFIX_EXP_NODE_TYPE_DOT,
+};
+
+enum UNARY_EXP_NODE_TYPE
+{
+    UNARY_EXP_NODE_TYPE_INCREMENT,
+    UNARY_EXP_NODE_TYPE_DECREMENT,
+    UNARY_EXP_NODE_TYPE_ADDRESS_OF,
+    UNARY_EXP_NODE_TYPE_DEREFERENCE,
+    UNARY_EXP_NODE_TYPE_PLUS,
+    UNARY_EXP_NODE_TYPE_MINUS,
+    UNARY_EXP_NODE_TYPE_BITWISE_NOT,
+    UNARY_EXP_NODE_TYPE_LOGICAL_NOT,
+    UNARY_EXP_NODE_TYPE_SIZEOF
+};
+
+enum MULTIPLICATIVE_EXP_NODE_TYPE
+{
+    MULTIPLICATIVE_EXP_NODE_TYPE_MULT = 0,
+    MULTIPLICATIVE_EXP_NODE_TYPE_DIV,
+    MULTIPLICATIVE_EXP_NODE_TYPE_MOD,
+};
+
+enum ADDITIVE_EXP_NODE_TYPE
+{
+    ADDITIVE_EXP_NODE_TYPE_ADD = 0,
+    ADDITIVE_EXP_NODE_TYPE_SUB,
+};
+
+enum SHIFT_EXP_NODE_TYPE
+{
+    SHIFT_EXP_NODE_TYPE_SHIFT_LEFT = 0,
+    SHIFT_EXP_NODE_TYPE_SHIFT_RIGHT,  
+};
+
+struct exp_tree_t
+{
+    struct exp_tree_t *next;
+    struct exp_node_t *root;
+};
+
+struct exp_node_t
+{
+    struct exp_node_t *     left;
+    struct exp_node_t *     right;
+    uint32_t                type;
+    uint32_t                sub_type;
+    union constant_t        constant;
 };
 
 struct base_exp_node_t
@@ -372,13 +461,7 @@ struct base_exp_node_t
 ************************************************************
 */
 
-enum PRIMARY_EXP_NODE_TYPE
-{
-    PRIMARY_EXP_NODE_TYPE_IDENTIFIER = 0,
-    PRIMARY_EXP_NODE_TYPE_STRING_LITERAL,
-    PRIMARY_EXP_NODE_TYPE_INTEGER_CONSTANT,
-    PRIMARY_EXP_NODE_TYPE_EXPRESSION,
-};
+
 
 struct primary_exp_node_t
 {
@@ -393,15 +476,7 @@ struct primary_exp_node_t
 ************************************************************
 */
 
-enum POSTFIX_EXP_NODE_TYPE
-{
-    POSTFIX_EXP_NODE_TYPE_FUNC_CALL = 0,
-    POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX,
-    POSTFIX_EXP_NODE_TYPE_INCREMENT,
-    POSTFIX_EXP_NODE_TYPE_DECREMENT,
-    POSTFIX_EXP_NODE_TYPE_ARROW,
-    POSTFIX_EXP_NODE_TYPE_DOT,
-};
+
 
 struct postfix_exp_node_t
 {
@@ -415,18 +490,7 @@ struct postfix_exp_node_t
 ************************************************************
 */
 
-enum UNARY_EXP_NODE_TYPE
-{
-    UNARY_EXP_NODE_TYPE_INCREMENT,
-    UNARY_EXP_NODE_TYPE_DECREMENT,
-    UNARY_EXP_NODE_TYPE_ADDRESS_OF,
-    UNARY_EXP_NODE_TYPE_DEREFERENCE,
-    UNARY_EXP_NODE_TYPE_PLUS,
-    UNARY_EXP_NODE_TYPE_MINUS,
-    UNARY_EXP_NODE_TYPE_BITWISE_NOT,
-    UNARY_EXP_NODE_TYPE_LOGICAL_NOT,
-    UNARY_EXP_NODE_TYPE_SIZEOF
-};
+
 
 struct unary_exp_node_t
 {
@@ -440,12 +504,7 @@ struct unary_exp_node_t
 ************************************************************
 */
 
-enum MULTIPLICATIVE_EXP_NODE_TYPE
-{
-    MULTIPLICATIVE_EXP_NODE_TYPE_MULT = 0,
-    MULTIPLICATIVE_EXP_NODE_TYPE_DIV,
-    MULTIPLICATIVE_EXP_NODE_TYPE_MOD,
-};
+
 
 struct multiplicative_exp_node_t
 {
@@ -459,11 +518,7 @@ struct multiplicative_exp_node_t
 ************************************************************
 */
 
-enum ADDITIVE_EXP_NODE_TYPE
-{
-    ADDITIVE_EXP_NODE_TYPE_ADD = 0,
-    ADDITIVE_EXP_NODE_TYPE_SUB,
-};
+
 
 struct additive_exp_node_t
 {
@@ -552,6 +607,8 @@ struct scope_t
     struct scope_t *    next;
     struct object_t *   objects;
     struct object_t *   last_object;
+    struct exp_tree_t * expressions;
+    struct exp_tree_t * last_expression;
     uint32_t            active;
 };
 
@@ -564,21 +621,29 @@ struct scope_t
 
 struct parser_t
 {
-    struct token_t *            tokens;
-    struct token_t *            cur_token;
-    struct token_t *            next_token;
+    // struct token_t *            tokens;
+    // struct token_t *            cur_token;
+    // struct token_t *            next_token;
+
+    uint32_t                    line;
+    uint32_t                    column;
+    uint32_t                    src_offset;
+    char *                      src;
+
+    struct token_t              cur_token;
+    struct token_t              next_token;
 
     uint32_t                    declaration_depth;
 
     uint32_t                    param_list_level;
     uint32_t                    aggregate_level;
 
-    struct aggretage_type_t *   aggregate_types;
+    struct type_t *             aggregate_types;
     struct base_type_t *        typedef_types;
 
 //    int scope_stack_top;
 //    struct scope_t **scope_stack;
-    struct scope_t *            current_scope;
+    struct scope_t *            cur_scope;
     struct declarator_t *       cur_function;
 };
 

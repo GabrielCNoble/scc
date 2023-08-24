@@ -146,7 +146,7 @@ struct token_t lex_token(char *text, uint32_t *offset, uint32_t *line, uint32_t 
     struct token_t token;
     static char token_text[8192];
     uint32_t token_text_index = 0;
-    uint32_t token_type = TOKEN_UNKNOWN;
+    uint32_t token_type = TOKEN_EOF;
     uint32_t token_name = TOKEN_UNKNOWN;
     union constant_t constant;
     uint32_t reserved_token_type;
@@ -211,8 +211,10 @@ struct token_t lex_token(char *text, uint32_t *offset, uint32_t *line, uint32_t 
         break;
 
         case CHAR_LETTER:
+        {
             token_type = TOKEN_IDENTIFIER;
             token_name = TOKEN_UNKNOWN;
+            uint32_t start_offset = text_offset;
 
             while(char_map[(uint32_t)text[text_offset]] & (CHAR_LETTER | CHAR_NUMBER))
             {
@@ -237,9 +239,11 @@ struct token_t lex_token(char *text, uint32_t *offset, uint32_t *line, uint32_t 
 
             if(token_type == TOKEN_IDENTIFIER)
             {
-                constant.string_constant = token_text;
+                // constant.string_constant = token_text;
+                constant.string_constant = text + start_offset;
+                constant.string_length = token_text_index;
             }
-
+        }
         break;
 
         case CHAR_PUNCTUATOR:
@@ -556,6 +560,7 @@ struct token_t lex_token(char *text, uint32_t *offset, uint32_t *line, uint32_t 
     token.name = token_name;
     token.column = cur_column;
     token.line = cur_line;
+    
     *column = cur_column + text_offset - *offset;
     *line = cur_line;
     *offset = text_offset;

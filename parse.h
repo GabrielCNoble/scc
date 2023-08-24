@@ -45,11 +45,11 @@ void advance_token(struct parser_t *parser);
 ==========================================================================================
 */
 
-void stash_aggregate_type(struct parser_t *parser, struct aggretage_type_t *type);
+struct type_t *stash_aggregate_type(struct parser_t *parser, struct type_t *type);
+
+struct type_t *get_aggregate_type(struct parser_t *parser, char *name);
 
 struct base_type_t *stash_typedef_type(struct parser_t *parser, struct base_type_t *type);
-
-struct base_type_t *get_aggregate_type(struct parser_t *parser, char *name);
 
 struct base_type_t *copy_type(struct base_type_t *type);
 
