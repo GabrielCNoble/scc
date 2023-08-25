@@ -10,11 +10,12 @@
 
 int main()
 {
+    // int a;
+    // (int) a;)a;
+    
     char exp[1024];
     int exp_len;
     struct token_t *tokens;
-
-    int short a;
 
     while(1)
     {

@@ -92,7 +92,15 @@ enum TOKEN_KEYWORD
     TOKEN_KEYWORD_BREAK = TOKEN_KEYWORD_FIRST,
     TOKEN_KEYWORD_CASE,
     
-    TOKEN_KEYWORD_CONST,
+    /********************************/
+    TOKEN_KEYWORD_FIRST_TYPE_QUALIFIER,
+    TOKEN_KEYWORD_CONST = TOKEN_KEYWORD_FIRST_TYPE_QUALIFIER,
+    TOKEN_KEYWORD_RESTRICT,
+    TOKEN_KEYWORD_VOLATILE,
+    TOKEN_KEYWORD_LAST_TYPE_QUALIFIER = TOKEN_KEYWORD_VOLATILE,
+    /********************************/
+
+
     TOKEN_KEYWORD_CONTINUE,
     TOKEN_KEYWORD_DEFAULT,
     TOKEN_KEYWORD_DO,
@@ -134,7 +142,7 @@ enum TOKEN_KEYWORD
 
 
     
-    TOKEN_KEYWORD_RESTRICT,
+    
     TOKEN_KEYWORD_RETURN,
     
     
@@ -144,9 +152,6 @@ enum TOKEN_KEYWORD
     TOKEN_KEYWORD_SWITCH,
     
     
-    
-    
-    TOKEN_KEYWORD_VOLATILE,
     TOKEN_KEYWORD_WHILE,
     TOKEN_KEYWORD_UNKNOWN,
     TOKEN_KEYWORD_LAST = TOKEN_KEYWORD_UNKNOWN
@@ -256,6 +261,23 @@ enum TYPES
     TYPE_UNKNOWN,
 };
 
+enum PRIM_TYPES
+{
+    PRIM_TYPE_CHAR,
+    PRIM_TYPE_UCHAR,
+    PRIM_TYPE_SHORT,
+    PRIM_TYPE_USHORT,
+    PRIM_TYPE_INT,
+    PRIM_TYPE_UINT,
+    PRIM_TYPE_LONG,
+    PRIM_TYPE_LLONG,
+    PRIM_TYPE_ULONG,
+    PRIM_TYPE_ULLONG,
+    PRIM_TYPE_FLOAT,
+    PRIM_TYPE_DOUBLE,
+    PRIM_TYPE_LDOUBLE,
+};
+
 struct pointer_t
 {
     uint32_t                count;
@@ -268,14 +290,13 @@ struct declarator_t;
 
 struct type_t 
 {
-    struct type_t *         next;
-    // struct decl_spec_t *    specifiers;
-    uint32_t                specifiers;
-    struct pointer_t *      pointer;
-    struct pointer_t *      last_pointer;
+    struct type_t *                 next;
+    uint32_t                        specifiers;
+    struct pointer_t *              pointer;
+    struct pointer_t *              last_pointer;
 
-    uint32_t                type;
-    uint32_t                complete;
+    uint32_t                        type;
+    uint32_t                        complete;
 
     union
     {
@@ -301,6 +322,11 @@ struct type_t
             uint32_t                prototype;
             struct scope_t *        body;
         } func;
+
+        struct
+        {
+            uint32_t                type;
+        } primitive;
     };
 };
 
@@ -311,57 +337,57 @@ struct declarator_t
     struct type_t *         type;
 };
 
-struct base_type_t
-{
-    struct base_type_t *next;
-    uint32_t            type;
-};
+// struct base_type_t
+// {
+//     struct base_type_t *next;
+//     uint32_t            type;
+// };
 
-struct array_type_t
-{
-    struct base_type_t      base;
-    struct base_type_t *    elem_type;
-    uint32_t                size;
-};
+// struct array_type_t
+// {
+//     struct base_type_t      base;
+//     struct base_type_t *    elem_type;
+//     uint32_t                size;
+// };
 
-struct aggretage_type_t
-{
-    struct base_type_t      base;
-    struct link_type_t *    fields;
-    char *                  name;
-};
+// struct aggretage_type_t
+// {
+//     struct base_type_t      base;
+//     struct link_type_t *    fields;
+//     char *                  name;
+// };
 
-struct function_type_t
-{
-    struct base_type_t      base;
-    struct link_type_t *    args;
-    uint32_t                arg_count;
-    uint32_t                old_style;
-};
+// struct function_type_t
+// {
+//     struct base_type_t      base;
+//     struct link_type_t *    args;
+//     uint32_t                arg_count;
+//     uint32_t                old_style;
+// };
 
 /* not really a type, but is here
 to make implementation easier... */
-struct identifier_type_t
-{
-    struct base_type_t base;
-    char *             identifier;
-};
+// struct identifier_type_t
+// {
+//     struct base_type_t base;
+//     char *             identifier;
+// };
 
 /* used to link types together, as in
 the fields of a struct/union */
-struct link_type_t
-{
-    struct base_type_t base;
-    struct base_type_t *type;
-};
+// struct link_type_t
+// {
+//     struct base_type_t base;
+//     struct base_type_t *type;
+// };
 
 /* not really a type, but is here
 to make implementation easier... */
-struct typedef_type_t
-{
-    struct base_type_t base;
-    struct base_type_t *type;
-};
+// struct typedef_type_t
+// {
+//     struct base_type_t base;
+//     struct base_type_t *type;
+// };
 
 
 /*
@@ -374,12 +400,13 @@ struct typedef_type_t
 
 enum EXP_NODE_TYPE
 {
-    EXP_NODE_TYPE_PRIMARY           = 1,
-    EXP_NODE_TYPE_POSTFIX           = 1 << 1,
-    EXP_NODE_TYPE_UNARY             = 1 << 2,
-    EXP_NODE_TYPE_MULTIPLICATIVE    = 1 << 3,
-    EXP_NODE_TYPE_ADDITIVE          = 1 << 4,
-    EXP_NODE_TYPE_SHIFT             = 1 << 5,
+    EXP_NODE_TYPE_PRIMARY = 0,
+    EXP_NODE_TYPE_POSTFIX,           
+    EXP_NODE_TYPE_UNARY,
+    EXP_NODE_TYPE_CAST,
+    EXP_NODE_TYPE_MULTIPLICATIVE,
+    EXP_NODE_TYPE_ADDITIVE,
+    EXP_NODE_TYPE_SHIFT,
     EXP_NODE_TYPE_END,
 };
 
@@ -448,12 +475,12 @@ struct exp_node_t
     union constant_t        constant;
 };
 
-struct base_exp_node_t
-{
-    struct base_exp_node_t *left;
-    struct base_exp_node_t *right;
-    uint16_t type;
-};
+// struct base_exp_node_t
+// {
+//     struct base_exp_node_t *left;
+//     struct base_exp_node_t *right;
+//     uint16_t type;
+// };
 
 /*
 ************************************************************
@@ -463,12 +490,12 @@ struct base_exp_node_t
 
 
 
-struct primary_exp_node_t
-{
-    struct base_exp_node_t base;
-    uint16_t type;
-    union constant_t constant;
-};
+// struct primary_exp_node_t
+// {
+//     struct base_exp_node_t base;
+//     uint16_t type;
+//     union constant_t constant;
+// };
 
 /*
 ************************************************************
@@ -478,11 +505,11 @@ struct primary_exp_node_t
 
 
 
-struct postfix_exp_node_t
-{
-    struct base_exp_node_t base;
-    uint16_t type;
-};
+// struct postfix_exp_node_t
+// {
+//     struct base_exp_node_t base;
+//     uint16_t type;
+// };
 
 /*
 ************************************************************
@@ -492,11 +519,11 @@ struct postfix_exp_node_t
 
 
 
-struct unary_exp_node_t
-{
-    struct base_exp_node_t base;
-    uint16_t type;
-};
+// struct unary_exp_node_t
+// {
+//     struct base_exp_node_t base;
+//     uint16_t type;
+// };
 
 /*
 ************************************************************
@@ -506,11 +533,11 @@ struct unary_exp_node_t
 
 
 
-struct multiplicative_exp_node_t
-{
-    struct base_exp_node_t base;
-    uint16_t type;
-};
+// struct multiplicative_exp_node_t
+// {
+//     struct base_exp_node_t base;
+//     uint16_t type;
+// };
 
 /*
 ************************************************************
@@ -520,11 +547,11 @@ struct multiplicative_exp_node_t
 
 
 
-struct additive_exp_node_t
-{
-    struct base_exp_node_t base;
-    uint16_t type;
-};
+// struct additive_exp_node_t
+// {
+//     struct base_exp_node_t base;
+//     uint16_t type;
+// };
 
 /*
 ************************************************************
@@ -541,13 +568,14 @@ enum STORAGE_CLASS
 
 struct object_t
 {
-    struct object_t *   next;
-    struct scope_t *    scope;
-    struct type_t *     type;
+    struct object_t *       next;
+    struct scope_t *        scope;
+    struct declarator_t *   declarator;
+    // struct type_t *     type;
     // struct base_type_t *type;
-    char *              identifier;
-    int                 storage_class;
-    unsigned int        offset;            /* offset from the segment pointer... */
+    // char *              identifier;
+    // int                 storage_class;
+    unsigned int            offset;            /* offset from the segment pointer... */
 };
 
 struct function_t
@@ -601,15 +629,20 @@ struct switch_statement_t
 
 struct scope_t
 {
-    struct scope_t *    parent;
-    struct scope_t *    children;
-    struct scope_t *    last_child;
-    struct scope_t *    next;
-    struct object_t *   objects;
-    struct object_t *   last_object;
-    struct exp_tree_t * expressions;
-    struct exp_tree_t * last_expression;
-    uint32_t            active;
+    struct scope_t *        parent;
+    struct scope_t *        children;
+    struct scope_t *        last_child;
+    struct scope_t *        next;
+
+    struct object_t *       objects;
+    struct object_t *       last_object;
+
+    struct exp_tree_t *     expressions;
+    struct exp_tree_t *     last_expression;
+
+    /* whose function this is the body of */
+    struct declarator_t *   function;
+    uint32_t                active;
 };
 
 /*
@@ -618,6 +651,12 @@ struct scope_t
 ************************************************************
 */
 
+enum PARSER_FLAGS
+{
+    PARSER_FLAG_ARG_LIST = 1,
+    PARSER_FLAG_TYPE_NAME = 1 << 1,
+    // PARSER_FLAG_NO_INIT = 1 << 2
+};
 
 struct parser_t
 {

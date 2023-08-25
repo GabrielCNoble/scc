@@ -1,39 +1,39 @@
 #include "obj.h"
 
-struct object_t *create_object(struct parser_t *parser, struct base_type_t *type)
+struct object_t *create_object(struct parser_t *parser, struct declarator_t *declarator)
 {
-    struct object_t *object;
-    struct identifier_type_t *object_type;
+    struct object_t *object = NULL;
 
-    // if(type->type == TYPE_LINK)
-    // {
-    //     type = ((struct link_type_t *)type)->type;
-    // }
+    if(declarator->identifier != NULL)
+    {
+        object = get_object(parser, declarator->identifier);
 
-    // object_type = (struct identifier_type_t *)type;
+        if(object == NULL)
+        {
+            object = calloc(1, sizeof(struct object_t));
+            object->declarator = declarator;
+            object->scope = parser->cur_scope;
 
-    // object = calloc(sizeof(struct object_t), 1);
-    // object->type = object_type->base.next;
-    // object->scope = parser->current_scope;
-    // object->id = strdup(object_type->identifier);
+            if(parser->cur_scope->objects == NULL)
+            {
+                parser->cur_scope->objects = object;                
+            }
+            else
+            {
+                parser->cur_scope->last_object->next = object;
+            }
 
-    // if(!parser->current_scope->objects)
-    // {
-    //     parser->current_scope->objects = object;
-    // }
-    // else
-    // {
-    //     parser->current_scope->last_object->next = object;
-    // }
+            parser->cur_scope->last_object = object;
+        }
 
-    // parser->current_scope->last_object = object;
+    }
 
     return object;
 }
 
-struct object_t *get_object(struct parser_t *parser, char *id)
+struct object_t *get_object(struct parser_t *parser, char *identifier)
 {
-    struct object_t *object;
+    struct object_t *object = NULL;
     struct scope_t *scope;
 
     /* the search will start at the current scope,
@@ -41,23 +41,24 @@ struct object_t *get_object(struct parser_t *parser, char *id)
     This guarantees that objects in the outer
     scopes will be shadowed by objects in inner
     scopes that have the same identifier */
-    // scope = parser->current_scope;
-    // while(scope)
-    // {
-    //     object = scope->objects;
+    scope = parser->cur_scope;
+    
+    while(scope)
+    {
+        object = scope->objects;
 
-    //     while(object)
-    //     {
-    //         if(!strcmp(object->id, id))
-    //         {
-    //             return object;
-    //         }
+        while(object)
+        {
+            if(!strcmp(object->declarator->identifier, identifier))
+            {
+                return object;
+            }
 
-    //         object = object->next;
-    //     }
+            object = object->next;
+        }
 
-    //     scope = scope->parent;
-    // }
+        scope = scope->parent;
+    }
 
     return NULL;
 }

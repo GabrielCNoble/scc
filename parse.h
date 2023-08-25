@@ -67,9 +67,9 @@ void error(uint32_t line, uint32_t column, const char *format, ...);
 
 void parse(char *text);
 
-struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_list);
+struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags);
 
-struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator_t *declarator);
+struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator_t *declarator, uint32_t flags);
 
 struct base_type_t *parse_initializer(struct parser_t *parser);
 
@@ -91,11 +91,13 @@ void parse_jump_statement(struct parser_t *parser);
 
 void parse_expression_statement(struct parser_t *parser);
 
+void dump_program(struct parser_t *parser);
 
 
-void translate_expression(struct base_exp_node_t *exp);
 
-void translate_type(struct link_type_t *type, int single_reference);
+// void translate_expression(struct base_exp_node_t *exp);
+
+// void translate_type(struct link_type_t *type, int single_reference);
 
 
 

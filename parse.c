@@ -29,6 +29,8 @@ char *type_specifier_strings[] = {
     // TYPE_SPECIFIER_UNKNOWN,
 };
 
+static char tag[8192];
+
 uint32_t decl_specifier_lut[] = {
     [TOKEN_KEYWORD_INT]         = DECL_SPEC_INT,
     [TOKEN_KEYWORD_SHORT]       = DECL_SPEC_SHORT,
@@ -53,6 +55,22 @@ uint32_t decl_specifier_lut[] = {
     [TOKEN_KEYWORD_REGISTER]    = DECL_SPEC_REGISTER
 };
 
+uint32_t prim_type_size_lut[] = {
+    [PRIM_TYPE_CHAR]    = sizeof(char),
+    [PRIM_TYPE_UCHAR]   = sizeof(unsigned char),
+    [PRIM_TYPE_SHORT]   = sizeof(short),
+    [PRIM_TYPE_USHORT]  = sizeof(unsigned char),
+    [PRIM_TYPE_INT]     = sizeof(int),
+    [PRIM_TYPE_UINT]    = sizeof(unsigned int),
+    [PRIM_TYPE_LONG]    = sizeof(long),
+    [PRIM_TYPE_LLONG]   = sizeof(long long),
+    [PRIM_TYPE_ULONG]   = sizeof(unsigned long),
+    [PRIM_TYPE_ULLONG]  = sizeof(unsigned long long),
+    [PRIM_TYPE_FLOAT]   = sizeof(float),
+    [PRIM_TYPE_DOUBLE]  = sizeof(double),
+    [PRIM_TYPE_LDOUBLE] = sizeof(long double),
+};
+
 int is_type_specifier(struct token_t *token)
 {
     return token->type == TOKEN_KEYWORD && 
@@ -62,18 +80,9 @@ int is_type_specifier(struct token_t *token)
 
 int is_type_qualifier(struct token_t *token)
 {
-    if(token->type == TOKEN_KEYWORD)
-    {
-        switch(token->name)
-        {
-            case TOKEN_KEYWORD_CONST:
-            case TOKEN_KEYWORD_RESTRICT:
-            case TOKEN_KEYWORD_VOLATILE:
-                return 1;
-        }
-    }
-
-    return 0;
+    return token->type == TOKEN_KEYWORD && 
+        token->name >= TOKEN_KEYWORD_FIRST_TYPE_QUALIFIER &&
+        token->name <= TOKEN_KEYWORD_LAST_TYPE_QUALIFIER;
 }
 
 int is_storage_class_specifier(struct token_t *token)
@@ -357,6 +366,8 @@ void parse(char *text)
         parse_statement(&parser); 
     }
     while(parser.cur_token.type != TOKEN_EOF);
+
+    dump_program(&parser);
 }
 
 // uint32_t valid_type_specifier_lut[] = {
@@ -391,12 +402,12 @@ struct
     {.mask = 0}
 };
 
-struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_list)
+struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags)
 {
     struct declarator_t *declarators = NULL;
     struct declarator_t *last_declarator = NULL;
     parser->declaration_depth++;
-    in_arg_list = in_arg_list && 1;
+    // in_arg_list = in_arg_list && 1;
 
     /* this is a declaration, which means
     we're expecting a bunch of type qualifiers,
@@ -490,6 +501,7 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_
         {
             type = calloc(1, sizeof(struct type_t));
             type->type = TYPE_PRIMITIVE;
+            type->complete = 1;
         }
 
         type->specifiers = specifiers;
@@ -509,25 +521,17 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_
     //     }
     // }
 
-    if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+    if(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_SEMICOLON)
     {
-        if(parser->cur_token.name == TOKEN_PUNCTUATOR_SEMICOLON)
-        {
-            /* end of declaration, no declarator */
-            advance_token(parser);
-        }
-        else
-        {
-            error(parser->cur_token.line, parser->cur_token.column, "Expecting ';' or declarator");
-        }
+        /* end of declaration, no declarator */
+        advance_token(parser);
     }
     else
     {
         while(1)
         {
             /* declarator: identifier, function, array, pointer, etc... */
-            struct declarator_t *declarator = parse_declarator(parser, NULL);
-
+            struct declarator_t *declarator = parse_declarator(parser, NULL, flags);
             struct type_t *declarator_type = declarator->type;
 
             if(declarator_type != NULL)
@@ -555,96 +559,128 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_
 
             last_declarator = declarator;
 
-            if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+            if(flags & (PARSER_FLAG_ARG_LIST | PARSER_FLAG_TYPE_NAME))
             {
-                if(parser->cur_token.name == TOKEN_PUNCTUATOR_EQUAL)
+                if(parser->cur_token.type == TOKEN_PUNCTUATOR && 
+                    (parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA || 
+                     parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS))
                 {
-                    if(in_arg_list)
-                    {
-                        /* error: can't assign to function parameter */
-                        error(parser->cur_token.line, parser->cur_token.column, "Can't assign to function parameter");
-                    }
-                    /* handle assignment */
-                }
-
-                if(parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA)
-                {
-                    if(in_arg_list)
-                    {
-                        /* we're currently parsing the argument list of a function. However, paramaters need to 
-                        have a full declaration, and so we need to gtfo here so the caller can handle the ',' token
-                        and call us again, so we can apply the parsing for an entire declaration. */
-                        break;
-                    }
-                    else
-                    {
-                        advance_token(parser);
-
-                        // if(is_declaration_specifier(parser->cur_token))
-                        if(parser->cur_token.type != TOKEN_IDENTIFIER && !is_type_qualifier(&parser->cur_token))
-                        {
-                            error(parser->cur_token.line, parser->cur_token.column, "Expected declarator");
-                        }
-                    }
-                }
-                else if(!in_arg_list && parser->cur_token.name == TOKEN_PUNCTUATOR_SEMICOLON)
-                {
-                    /* end of declaration */
-                    advance_token(parser);
-                    if(declarator->type != NULL && declarator->type->type == TYPE_FUNCTION)
-                    {
-                        declarator->type->func.prototype = 1;
-                    }
-                    break;
-                }
-                else if(in_arg_list && parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
-                {
-                    /* end of function parameter list */
-                    break;
-                }
-                else if(parser->cur_token.name == TOKEN_PUNCTUATOR_OBRACE)
-                {
-                    /* we found what's probably the function body, so'll gtfo here so the caller handles it */
+                    /* next parameter or end of list. The declarator parsing code will handle the ',' or the ')' */
                     break;
                 }
                 else
                 {
-                    error(parser->cur_token.line, parser->cur_token.column, "Expecting ',', ';' or '='");
+                    error(parser->cur_token.line, parser->cur_token.column, "Expected ',' or ')'");
+                }
+            }
+            else
+            {
+                if(parser->declaration_depth == 1)
+                {
+                    if(declarator->identifier == NULL)
+                    {
+                        error(parser->cur_token.line, parser->cur_token.column, "Missing identifier");
+                    }
+
+                    create_object(parser, declarator);
+                }
+
+                if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+                {
+                    switch(parser->cur_token.name)
+                    {
+                        case TOKEN_PUNCTUATOR_EQUAL:
+                            /* initialization */
+                        break;
+
+                        case TOKEN_PUNCTUATOR_COMMA:
+                            advance_token(parser);
+                        break;
+
+                        case TOKEN_PUNCTUATOR_OBRACE:
+                        case TOKEN_PUNCTUATOR_SEMICOLON:
+                            /* this is either the end of this declaration or the start of a function
+                            body. Either way, the caller handles it. */
+                        break;
+
+                        default:
+                            error(parser->cur_token.line, parser->cur_token.column, "Unexpected token");    
+                        break;
+                    }
+
+                }
+                else
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Expected ';', or '='");
                 }
             }
 
-
-            // if(!is_in_arg_list)
+            // if(parser->cur_token.type == TOKEN_PUNCTUATOR)
             // {
-            //     if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+            //     if(parser->cur_token.name == TOKEN_PUNCTUATOR_EQUAL)
             //     {
-            //         if(parser->cur_token.name == TOKEN_PUNCTUATOR_ASSIGN)
+            //         if(parser->declaration_depth != 1)
             //         {
-            //             /* deal with assignment, call the expression routines... */
+            //             // if(flags & PARSER_FLAG_ARG_LIST)
+            //             // {
+            //             //     error(parser->cur_token.line, parser->cur_token.column, "Can't assign to function parameter");
+            //             // }
             //         }
 
-            //         if(parser->cur_token.name == TOKEN_PUNCTUATOR_SEMICOLON)
-            //         {
-            //             advance_token(parser);
-            //             break;
-            //         }
-            //     }
-            //     else
-            //     {
-            //         /* error: expecting '=', ',' or ';'... */
+            //         break;
             //     }
 
             //     if(parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA)
             //     {
-            //         specifiers_qualifiers = copy_type(specifiers_qualifiers);
+            //         if(flags & PARSER_FLAG_ARG_LIST)
+            //         {
+            //             /* we're currently parsing the argument list of a function. However, paramaters need to 
+            //             have a full declaration, and so we need to gtfo here so the caller can handle the ',' token
+            //             and call us again, so we can apply the parsing for an entire declaration. */
+            //             break;
+            //         }
+            //         else
+            //         {
+            //             advance_token(parser);
+
+            //             if(parser->cur_token.type != TOKEN_IDENTIFIER && !is_type_qualifier(&parser->cur_token))
+            //             {
+            //                 error(parser->cur_token.line, parser->cur_token.column, "Expected declarator");
+            //             }
+            //         }
+            //     }
+            //     else if(!(flags & PARSER_FLAG_ARG_LIST) && parser->cur_token.name == TOKEN_PUNCTUATOR_SEMICOLON)
+            //     {
+            //         /* end of declaration */
+            //         advance_token(parser);
+            //         break;
+            //     }
+            //     else if((flags & (PARSER_FLAG_ARG_LIST | PARSER_FLAG_TYPE_NAME)) && parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
+            //     {
+            //         /* end of function parameter list or type name */
+            //         break;
+            //     }
+            //     else if(parser->cur_token.name == TOKEN_PUNCTUATOR_OBRACE)
+            //     {
+            //         /* we found what's probably the function body, so'll gtfo here so the caller handles it */
+            //         break;
             //     }
             //     else
             //     {
-            //         /* error: some non-sense going on... */
+            //         if(flags & PARSER_FLAG_ARG_LIST)
+            //         {
+            //             error(parser->cur_token.line, parser->cur_token.column, "Expecting ',' token");
+            //         }
+            //         else
+            //         {
+            //             error(parser->cur_token.line, parser->cur_token.column, "Expecting ',', ';' or '='");
+            //         }
             //     }
             // }
-
-            // advance_token(parser);
+            // else
+            // {
+            //     error(parser->cur_token.line, parser->cur_token.column, "Missing ';' after declaration");
+            // }
         }
     }
 
@@ -653,7 +689,7 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t in_arg_
     return declarators;
 }
 
-struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator_t *declarator)
+struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator_t *declarator, uint32_t flags)
 {
     /*
         A declarator is defined as:
@@ -774,8 +810,8 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
         if(parser->cur_token.name == TOKEN_PUNCTUATOR_ASTERISC)
         {
             type = calloc(1, sizeof(struct type_t));
-            declarator->type = type;
             type->type = TYPE_POINTER;
+            type->complete = 1;
             while(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_ASTERISC)
             {
                 struct pointer_t *pointer = calloc(1, sizeof(struct pointer_t));
@@ -807,16 +843,21 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                 }
             }
         }
-        else
-        {
-            error(parser->cur_token.line, parser->cur_token.column, "Expecting '*' or type qualifier");
-        }
+        // else
+        // {
+        //     error(parser->cur_token.line, parser->cur_token.column, "Expecting '*' or type qualifier");
+        // }
     }
 
     /* direct-declarator: can be an identifier, an declarator enclosed in parenthesis, or an direct-declarator */
     switch(parser->cur_token.type)
     {
         case TOKEN_IDENTIFIER:
+            if(flags & PARSER_FLAG_TYPE_NAME)
+            {
+                error(parser->cur_token.line, parser->cur_token.column, "Unexpected identifier in type name");
+            }
+
             declarator->identifier = strndup(parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
             advance_token(parser);
         break;
@@ -827,23 +868,7 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                 /* declarator is inside parenthesis, which means anything inside of it has precedence. If
                 there are any '*', for example, the declarator will have pointer to something type */
                 advance_token(parser);
-                struct type_t *next_type = declarator->type;
-                declarator->type = NULL;
-                parse_declarator(parser, declarator);
-
-                if(declarator->type != NULL)
-                {
-                    /* there was '*' and type qualifiers inside the parenthesis, so the declarator type
-                    is now pointer to whatever we find when we reach the end of this call */
-                    struct type_t *last_type = declarator->type;
-
-                    while(last_type->next)
-                    {
-                        last_type = last_type->next;
-                    }
-
-                    last_type->next = next_type;
-                }
+                parse_declarator(parser, declarator, flags);
 
                 if(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
                 {
@@ -854,10 +879,10 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                     error(parser->cur_token.line, parser->cur_token.column, "Expecting ')' token");
                 }
             }
-            else
-            {
-                error(parser->cur_token.line, parser->cur_token.column, "Unexpected token");
-            }
+            // else
+            // {
+            //     error(parser->cur_token.line, parser->cur_token.column, "Unexpected token");
+            // }
         break;
     }
 
@@ -884,47 +909,50 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                 struct declarator_t *args = NULL;
                 struct declarator_t *last_arg = NULL;
 
-                while(1)
+                if(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_CPARENTHESIS)
                 {
-                    /* parse parameter-list... */
-                    struct declarator_t *arg = parse_declaration(parser, 1);
-
-                    if(arg)
+                    while(1)
                     {
-                        temp_type.func.arg_count++;
+                        /* parse parameter-list... */
+                        struct declarator_t *arg = parse_declaration(parser, PARSER_FLAG_ARG_LIST);
 
-                        if(args == NULL)
+                        if(arg)
                         {
-                            args = arg;
-                        }
-                        else
-                        {
-                            last_arg->next = arg;
-                        }
+                            temp_type.func.arg_count++;
 
-                        last_arg = arg;
-                    }
-
-                    if(parser->cur_token.type == TOKEN_PUNCTUATOR)
-                    {
-                        if(parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
-                        {
-                            break;
-                        }
-                        else if(parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA)
-                        {
-                            advance_token(parser);
-
-                            if(!is_declaration_specifier(&parser->cur_token))
+                            if(args == NULL)
                             {
-                                /* function parameters require declaration specifiers */
-                                error(parser->cur_token.line, parser->cur_token.column, "Expecting declaration specifiers");
+                                args = arg;
                             }
+                            else
+                            {
+                                last_arg->next = arg;
+                            }
+
+                            last_arg = arg;
                         }
-                        else
+
+                        if(parser->cur_token.type == TOKEN_PUNCTUATOR)
                         {
-                            /* error: unexpected token. Expecting ')' or ','... */
-                            error(parser->cur_token.line, parser->cur_token.column, "Unexpected token. Expecting ')' or','");
+                            if(parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
+                            {
+                                break;
+                            }
+                            else if(parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA)
+                            {
+                                advance_token(parser);
+
+                                if(!is_declaration_specifier(&parser->cur_token))
+                                {
+                                    /* function parameters require declaration specifiers */
+                                    error(parser->cur_token.line, parser->cur_token.column, "Expecting declaration specifiers");
+                                }
+                            }
+                            else
+                            {
+                                /* error: unexpected token. Expecting ')' or ','... */
+                                error(parser->cur_token.line, parser->cur_token.column, "Unexpected token. Expecting ')' or','");
+                            }
                         }
                     }
                 }
@@ -933,84 +961,54 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
 
                 /* ) */
                 advance_token(parser);
-
-
-//                if(!parser->param_list_level)
-//                {
-//                    /* if the param_list_level is zero,it means we're not dealing with declarators
-//                    that are inside a param list. So, here we find out whether this function declaration
-//                    is using the new or the old style... */
-//
-//                    if(function_type->param_count)
-//                    {
-//
-//                        /* first param will tell us whether this is
-//                        new or old style declaration... */
-//                        param_or_field = function_type->params;
-//
-//                        temp = param_or_field->type;
-//
-//                        if(temp->type != TYPE_IDENTIFIER)
-//                        {
-//                            /* error: something something... */
-//                        }
-//
-//                        temp = temp->next;
-//
-//                        if(!temp)
-//                        {
-//                            /* if this the old style declaration, the only thing
-//                            we get in each parameter is its identifier... */
-//
-//                            function_type->old_style = 1;
-//                        }
-//
-//                        param_or_field = (struct reference_type_t *)param_or_field->base.next;
-//
-//                        while(param_or_field)
-//                        {
-//                            temp = param_or_field->type;
-//
-//                            if(temp->type != TYPE_IDENTIFIER)
-//                            {
-//                                /* error: missing parameter name... */
-//                            }
-//
-//                            temp = temp->next;
-//
-//                            if((temp && 1) == function_type->old_style)
-//                            {
-//                                /* error: mixing old style with prototype... */
-//                            }
-//
-//                            param_or_field = (struct reference_type_t *)param_or_field->base.next;
-//                        }
-//                    }
-//                }
-
             break;
 
             case TOKEN_PUNCTUATOR_OBRACKET:
-                // array_type = calloc(sizeof(struct array_type_t), 1);
+                temp_type.type = TYPE_ARRAY;
 
                 /* [... */
                 advance_token(parser);
+
+                if(parser->cur_token.type != TOKEN_PUNCTUATOR)
+                {
+                    // if(parser->cur_token.type == TOKEN_KEYWORD && parser->cur_token.name == TOKEN_KEYWORD_STATIC)
+                    // {
+                    //     advance_token(parser);
+                    // }
+
+                    // while(is_type_qualifier(&parser->cur_token))
+                    // {
+                    //     advance_token(parser);
+                    // }
+
+                    struct exp_node_t *assign_exp = assignment_exp(parser);
+                }
+
+                if(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_CBRACKET)
+                {
+                    /* ']' */
+                    advance_token(parser);
+                }
+                else
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Expected ']'");
+                }
             break;
 
-            default:
-                /* anything else is wrong... */
-            break;
+            // case TOKEN_PUNCTUATOR_CPARENTHESIS:
+            //     /* end of function parameter list, end of recursive declarator or end of type name  */
+            // break;
         }
 
         if(temp_type.type != TYPE_UNKNOWN)
         {
             if(type == NULL)
             {
-                declarator->type = calloc(1, sizeof(struct type_t));
-                type = declarator->type;
+                type = calloc(1, sizeof(struct type_t));
             }
 
             type->type = temp_type.type;
+            type->complete = temp_type.complete;
 
             switch(temp_type.type)
             {
@@ -1028,6 +1026,22 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                 break;
             }
         }
+
+        if(declarator->type == NULL)
+        {
+            declarator->type = type;
+        }
+        else
+        {
+            struct type_t *declarator_type = declarator->type;
+
+            while(declarator_type->next)
+            {
+                declarator_type = declarator_type->next;
+            }       
+
+            declarator_type->next = type;
+        }
     }
     else
     {
@@ -1040,9 +1054,11 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
 
 struct type_t *parse_aggregate_declaration(struct parser_t *parser)
 {
-    struct type_t *type = calloc(sizeof(struct type_t), 1);
-    type->type = type_specifier_from_token(&parser->cur_token);
-    type->complete = 0;
+    // struct type_t *type = calloc(sizeof(struct type_t), 1);
+    struct type_t *type = NULL;
+    uint32_t aggregate_type = type_specifier_from_token(&parser->cur_token);
+    // type->type = type_specifier_from_token(&parser->cur_token);
+    // type->complete = 0;
     /* struct/union */
     advance_token(parser);
 
@@ -1054,9 +1070,31 @@ struct type_t *parse_aggregate_declaration(struct parser_t *parser)
     /* optional tag */
     if(parser->cur_token.type == TOKEN_IDENTIFIER)
     {
-        type->aggregate.identifier = strndup(parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
+        strncpy(tag, parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
+        tag[parser->cur_token.constant.string_length] = '\0';
+        type = get_aggregate_type(parser, tag);
+        if(type != NULL)
+        {
+            if(type->complete)
+            {
+                error(parser->cur_token.line, parser->cur_token.column, "Redefinition of aggregate type %s", tag);
+            }
+        }
+        else
+        {
+            type = calloc(sizeof(struct type_t), 1);
+            type->aggregate.identifier = strdup(tag);
+            stash_aggregate_type(parser, type);
+        }
+
         advance_token(parser);
     }
+    else
+    {
+        type = calloc(sizeof(struct type_t), 1);
+    }
+
+    type->type = aggregate_type;
 
     if(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_OBRACE)
     {
@@ -1206,6 +1244,7 @@ void parse_compound_statement(struct parser_t *parser)
     if(parser->cur_function != NULL)
     {
         parser->cur_function->type->func.body = parser->cur_scope;
+        parser->cur_scope->function = parser->cur_function;
     }
 
     /* {... */
@@ -1227,22 +1266,28 @@ void parse_compound_statement(struct parser_t *parser)
                         error(parser->cur_token.line, parser->cur_token.column, "Functions may be declared only in file scope");
                     }
 
-                    if(!declarator->type->func.prototype)
+                    if(parser->cur_token.type == TOKEN_PUNCTUATOR)
                     {
-                        /* function body */
-
-                        if(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_OBRACE)
+                        if(parser->cur_token.name == TOKEN_PUNCTUATOR_OBRACE)
                         {
-                            error(parser->cur_token.line, parser->cur_token.column, "Expecting '{' token");
+                            /* function body */
+                            parser->cur_function = declarator;
+                            parse_compound_statement(parser);
+                            parser->cur_function = NULL;
+                            declarator->type->complete = 1;
                         }
-
-                        parser->cur_function = declarator;
-                        parse_compound_statement(parser);
-                        parser->cur_function = NULL;
+                        // else if(token->)
+                        // {
+                        //     error(parser->cur_token.line, parser->cur_token.column, "Expecting '{' token");
+                        // }
                     }
                 }
 
-                // create_object()
+                // while(declarator)
+                // {
+                //     create_object(parser, declarator);
+                //     declarator = declarator->next; 
+                // }
             }
         }
         else
@@ -1287,7 +1332,7 @@ void parse_expression_statement(struct parser_t *parser)
 
     if(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_SEMICOLON)
     {
-        error(parser->cur_token.line, parser->cur_token.column, "Expecting ';");
+        error(parser->cur_token.line, parser->cur_token.column, "Expecting ';'");
     }
 
     /* ';' */
@@ -1308,126 +1353,87 @@ void parse_expression_statement(struct parser_t *parser)
     }
 }
 
-void translate_type(struct link_type_t *type, int single_reference)
+void dump_scope(struct parser_t *parser, struct scope_t *scope, uint32_t depth)
 {
-    // struct identifier_type_t *identifier;
-    // struct function_type_t *function;
-    // struct link_type_t *param_or_field;
-    // struct base_type_t *base_type;
-    // struct aggretage_type_t *aggretage_type;
+    if(scope->function != NULL)
+    {
+        for(uint32_t index = 0; index < depth; index++)
+        {
+            putchar(' ');
+        }
+        if(scope->function->type->func.args != NULL)
+        {
+            printf("function (%s)(", scope->function->identifier);
 
-    // while(type)
-    // {
-    //     base_type = type->type;
+            struct declarator_t *arg = scope->function->type->func.args;
+            while(arg)
+            {
+                if(arg->next != NULL)
+                {
+                    printf("(%s), ", arg->identifier);
+                }
+                else
+                {
+                    printf("(%s)", arg->identifier);
+                }
+                arg = arg->next;
+            }
 
-    //     while(base_type)
-    //     {
-    //         switch(base_type->type)
-    //         {
-    //             case TYPE_IDENTIFIER:
-    //                 identifier = (struct identifier_type_t *)base_type;
-    //                 printf("[%s] is ", identifier->identifier);
-    //             break;
+            printf(")\n");
+        }
+        else
+        {
+            printf("function (%s)(no args)\n", scope->function->identifier);
+        }
+    }
+    else if(scope->parent == NULL)
+    {
+        printf("file\n");
+    }
 
-    //             case TYPE_POINTER:
-    //                 printf("a pointer to ");
-    //             break;
+    for(uint32_t index = 0; index < depth; index++)
+    {
+        putchar(' ');
+    }
 
-    //             case TYPE_FUNCTION:
-    //                 function = (struct function_type_t *)base_type;
+    printf("{\n");
 
-    //                 printf("a function (");
+    struct object_t *object = scope->objects;
 
-    //                 param_or_field = function->args;
+    while(object)
+    {
+        if(object->declarator->type->type != TYPE_FUNCTION)
+        {
+            for(uint32_t index = 0; index < depth + 1; index++)
+            {
+                putchar(' ');
+            }
+            
+            printf("object (%s)\n", object->declarator->identifier);
+        }
+           
+        object = object->next;
+    }
 
-    //                 while(param_or_field)
-    //                 {
-    //                     translate_type(param_or_field, 1);
+    struct scope_t *child_scope = scope->children;
+    while(child_scope)
+    {
+        dump_scope(parser, child_scope, depth + 1);
+        child_scope = child_scope->next;
+    }
 
-    //                     param_or_field = (struct link_type_t *)param_or_field->base.next;
+    for(uint32_t index = 0; index < depth; index++)
+    {
+        putchar(' ');
+    }
 
-    //                     if(param_or_field)
-    //                     {
-    //                         printf(", ");
-    //                     }
-    //                 }
-
-    //                 printf("), returning ");
-    //             break;
-
-    //             case TYPE_STRUCT:
-    //                 aggretage_type = (struct aggretage_type_t *)base_type;
-
-    //                 if(aggretage_type->name)
-    //                 {
-    //                     printf("a struct [%s] {", aggretage_type->name);
-    //                 }
-    //                 else
-    //                 {
-    //                     printf("an anonymous struct {");
-    //                 }
-
-    //                 param_or_field = aggretage_type->fields;
-
-    //                 while(param_or_field)
-    //                 {
-    //                     translate_type(param_or_field, 1);
-
-    //                     param_or_field = (struct link_type_t *)param_or_field->base.next;
-
-    //                     if(param_or_field)
-    //                     {
-    //                         printf(", ");
-    //                     }
-    //                 }
-
-    //                 printf("}, ");
-
-
-    //             break;
-
-    //             case TYPE_INT:
-    //                 printf("an int");
-    //             break;
-
-    //             case TYPE_FLOAT:
-    //                 printf("a float");
-    //             break;
-
-    //             case TYPE_DOUBLE:
-    //                 printf("a double");
-    //             break;
-
-    //             case TYPE_VOID:
-    //                 printf("void");
-    //             break;
-
-    //             case TYPE_SHORT:
-    //                 printf("a short");
-    //             break;
-
-    //             case TYPE_CHAR:
-    //                 printf("a char");
-    //             break;
-
-    //             default:
-    //                 return;
-    //             break;
-    //         }
-
-    //         base_type = base_type->next;
-    //     }
-
-    //     type = single_reference ? NULL : (struct link_type_t *)type->base.next;
-    // }
+    printf("}\n");
 }
 
-
-
-
-
-
-
+void dump_program(struct parser_t *parser)
+{
+    dump_scope(parser, parser->cur_scope, 0);
+}
 
 
 
