@@ -443,9 +443,6 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags)
 
     if(is_declaration_specifier(&parser->cur_token))
     {
-        // struct decl_spec_t *specifiers = NULL;
-        // struct decl_spec_t *last_specifier = NULL;
-        // uint32_t found_type_specifiers = 0;
         uint32_t specifiers = 0;
         uint32_t long_count = 0;
 
@@ -561,11 +558,13 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags)
 
             if(flags & (PARSER_FLAG_ARG_LIST | PARSER_FLAG_TYPE_NAME))
             {
+                /* we're parsing the parameter list of a function or a type name */
                 if(parser->cur_token.type == TOKEN_PUNCTUATOR && 
                     (parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA || 
                      parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS))
                 {
-                    /* next parameter or end of list. The declarator parsing code will handle the ',' or the ')' */
+                    /* next parameter, end of parameter list or end of type name. 
+                    The the caller code will handle the ',' or the ')' */
                     break;
                 }
                 else
@@ -575,6 +574,8 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags)
             }
             else
             {
+                /* we're handling a declaration, and possibly a definition */
+
                 if(parser->declaration_depth == 1)
                 {
                     if(declarator->identifier == NULL)
@@ -587,27 +588,37 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags)
 
                 if(parser->cur_token.type == TOKEN_PUNCTUATOR)
                 {
-                    switch(parser->cur_token.name)
+                    if(parser->cur_token.name == TOKEN_PUNCTUATOR_EQUAL)
                     {
-                        case TOKEN_PUNCTUATOR_EQUAL:
-                            /* initialization */
-                        break;
+                        if(parser->declaration_depth == 1)
+                        {
 
-                        case TOKEN_PUNCTUATOR_COMMA:
-                            advance_token(parser);
-                        break;
-
-                        case TOKEN_PUNCTUATOR_OBRACE:
-                        case TOKEN_PUNCTUATOR_SEMICOLON:
-                            /* this is either the end of this declaration or the start of a function
-                            body. Either way, the caller handles it. */
-                        break;
-
-                        default:
-                            error(parser->cur_token.line, parser->cur_token.column, "Unexpected token");    
+                        }
+                        else
+                        {
+                            error(parser->cur_token.line, parser->cur_token.column, "Unexpected token '='");        
+                        }
+                    }
+                    else if(parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA)
+                    {
+                        /* multiple identifiers with the same "base" type */
+                        advance_token(parser);
+                    }
+                    else if(parser->cur_token.name == TOKEN_PUNCTUATOR_SEMICOLON)
+                    {
+                        /* end of definition, without initialization */
+                        advance_token(parser);
                         break;
                     }
-
+                    else if(parser->cur_token.name == TOKEN_PUNCTUATOR_OBRACE)
+                    {
+                        /* probably the start of a function body, which the caller will handle */
+                        break;
+                    }
+                    else
+                    {
+                        error(parser->cur_token.line, parser->cur_token.column, "Unexpected token");    
+                    }
                 }
                 else
                 {
@@ -849,22 +860,31 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
         // }
     }
 
-    /* direct-declarator: can be an identifier, an declarator enclosed in parenthesis, or an direct-declarator */
     switch(parser->cur_token.type)
     {
         case TOKEN_IDENTIFIER:
             if(flags & PARSER_FLAG_TYPE_NAME)
             {
                 error(parser->cur_token.line, parser->cur_token.column, "Unexpected identifier in type name");
-            }
+            }            
 
             declarator->identifier = strndup(parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
             advance_token(parser);
         break;
 
         case TOKEN_PUNCTUATOR:
+            /* handle a parenthesized declarator or a parenthesized abstract-declarator */
             if(parser->cur_token.name == TOKEN_PUNCTUATOR_OPARENTHESIS)
             {
+                if((flags & PARSER_FLAG_TYPE_NAME) && (parser->next_token.type != TOKEN_PUNCTUATOR ||
+                    (parser->next_token.name != TOKEN_PUNCTUATOR_ASTERISC && parser->next_token.name != TOKEN_PUNCTUATOR_OPARENTHESIS)))
+                {
+                    /* a parenthesised abstract-declarator will start with a '*' or a '(', so if we get anything else
+                    in here, it means we're dealing with a direct-abstract-declarator, so we gtfo here and let the
+                    upcoming code handle it. */
+                    break;
+                }
+
                 /* declarator is inside parenthesis, which means anything inside of it has precedence. If
                 there are any '*', for example, the declarator will have pointer to something type */
                 advance_token(parser);
@@ -879,13 +899,12 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                     error(parser->cur_token.line, parser->cur_token.column, "Expecting ')' token");
                 }
             }
-            // else
-            // {
-            //     error(parser->cur_token.line, parser->cur_token.column, "Unexpected token");
-            // }
         break;
     }
+    
 
+    /* handle direct-declarator that's not a parenthesized declarator or 
+    direct-abstract-declarator that's not a parenthezised abstract-declarator */
     if(parser->cur_token.type == TOKEN_PUNCTUATOR)
     {
         struct type_t temp_type = {.type = TYPE_UNKNOWN};
