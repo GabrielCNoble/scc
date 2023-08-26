@@ -337,66 +337,11 @@ struct declarator_t
     struct type_t *         type;
 };
 
-// struct base_type_t
-// {
-//     struct base_type_t *next;
-//     uint32_t            type;
-// };
-
-// struct array_type_t
-// {
-//     struct base_type_t      base;
-//     struct base_type_t *    elem_type;
-//     uint32_t                size;
-// };
-
-// struct aggretage_type_t
-// {
-//     struct base_type_t      base;
-//     struct link_type_t *    fields;
-//     char *                  name;
-// };
-
-// struct function_type_t
-// {
-//     struct base_type_t      base;
-//     struct link_type_t *    args;
-//     uint32_t                arg_count;
-//     uint32_t                old_style;
-// };
-
-/* not really a type, but is here
-to make implementation easier... */
-// struct identifier_type_t
-// {
-//     struct base_type_t base;
-//     char *             identifier;
-// };
-
-/* used to link types together, as in
-the fields of a struct/union */
-// struct link_type_t
-// {
-//     struct base_type_t base;
-//     struct base_type_t *type;
-// };
-
-/* not really a type, but is here
-to make implementation easier... */
-// struct typedef_type_t
-// {
-//     struct base_type_t base;
-//     struct base_type_t *type;
-// };
-
-
 /*
 ************************************************************
 ************************************************************
 ************************************************************
 */
-
-
 
 enum EXP_NODE_TYPE
 {
@@ -474,90 +419,6 @@ struct exp_node_t
     uint32_t                sub_type;
     union constant_t        constant;
 };
-
-// struct base_exp_node_t
-// {
-//     struct base_exp_node_t *left;
-//     struct base_exp_node_t *right;
-//     uint16_t type;
-// };
-
-/*
-************************************************************
-************************************************************
-************************************************************
-*/
-
-
-
-// struct primary_exp_node_t
-// {
-//     struct base_exp_node_t base;
-//     uint16_t type;
-//     union constant_t constant;
-// };
-
-/*
-************************************************************
-************************************************************
-************************************************************
-*/
-
-
-
-// struct postfix_exp_node_t
-// {
-//     struct base_exp_node_t base;
-//     uint16_t type;
-// };
-
-/*
-************************************************************
-************************************************************
-************************************************************
-*/
-
-
-
-// struct unary_exp_node_t
-// {
-//     struct base_exp_node_t base;
-//     uint16_t type;
-// };
-
-/*
-************************************************************
-************************************************************
-************************************************************
-*/
-
-
-
-// struct multiplicative_exp_node_t
-// {
-//     struct base_exp_node_t base;
-//     uint16_t type;
-// };
-
-/*
-************************************************************
-************************************************************
-************************************************************
-*/
-
-
-
-// struct additive_exp_node_t
-// {
-//     struct base_exp_node_t base;
-//     uint16_t type;
-// };
-
-/*
-************************************************************
-************************************************************
-************************************************************
-*/
 
 enum STORAGE_CLASS
 {

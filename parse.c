@@ -930,47 +930,58 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
 
                 if(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_CPARENTHESIS)
                 {
-                    while(1)
+                    if(parser->cur_token.type == TOKEN_KEYWORD && parser->cur_token.name == TOKEN_KEYWORD_VOID &&
+                        parser->next_token.type == TOKEN_PUNCTUATOR && parser->next_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
                     {
-                        /* parse parameter-list... */
-                        struct declarator_t *arg = parse_declaration(parser, PARSER_FLAG_ARG_LIST);
+                        /* special case of a function that takes no parameters */
 
-                        if(arg)
+                        /* void */
+                        advance_token(parser);
+                    }
+                    else
+                    {
+                        while(1)
                         {
-                            temp_type.func.arg_count++;
+                            /* parse parameter-list... */
+                            struct declarator_t *arg = parse_declaration(parser, PARSER_FLAG_ARG_LIST);
 
-                            if(args == NULL)
+                            if(arg)
                             {
-                                args = arg;
-                            }
-                            else
-                            {
-                                last_arg->next = arg;
-                            }
+                                temp_type.func.arg_count++;
 
-                            last_arg = arg;
-                        }
-
-                        if(parser->cur_token.type == TOKEN_PUNCTUATOR)
-                        {
-                            if(parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
-                            {
-                                break;
-                            }
-                            else if(parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA)
-                            {
-                                advance_token(parser);
-
-                                if(!is_declaration_specifier(&parser->cur_token))
+                                if(args == NULL)
                                 {
-                                    /* function parameters require declaration specifiers */
-                                    error(parser->cur_token.line, parser->cur_token.column, "Expecting declaration specifiers");
+                                    args = arg;
                                 }
+                                else
+                                {
+                                    last_arg->next = arg;
+                                }
+
+                                last_arg = arg;
                             }
-                            else
+
+                            if(parser->cur_token.type == TOKEN_PUNCTUATOR)
                             {
-                                /* error: unexpected token. Expecting ')' or ','... */
-                                error(parser->cur_token.line, parser->cur_token.column, "Unexpected token. Expecting ')' or','");
+                                if(parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
+                                {
+                                    break;
+                                }
+                                else if(parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA)
+                                {
+                                    advance_token(parser);
+
+                                    if(!is_declaration_specifier(&parser->cur_token))
+                                    {
+                                        /* function parameters require declaration specifiers */
+                                        error(parser->cur_token.line, parser->cur_token.column, "Expecting declaration specifiers");
+                                    }
+                                }
+                                else
+                                {
+                                    /* error: unexpected token. Expecting ')' or ','... */
+                                    error(parser->cur_token.line, parser->cur_token.column, "Unexpected token. Expecting ')' or','");
+                                }
                             }
                         }
                     }
