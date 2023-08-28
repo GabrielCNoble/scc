@@ -459,6 +459,7 @@ enum EXP_NODE_TYPES
 
 struct exp_tree_t
 {
+    POOL_ELEMENT;
     struct exp_tree_t *next;
     struct exp_node_t *root;
 };
@@ -513,6 +514,28 @@ struct function_t
 ************************************************************
 ************************************************************
 */
+
+enum STATEMENT_TYPES
+{
+    STATEMENT_TYPE_LABELED,
+    STATEMENT_TYPE_EXPRESSION,
+    STATEMENT_TYPE_SELECTION,
+    STATEMENT_TYPE_ITERATION,
+    STATEMENT_TYPE_JUMP
+};
+
+struct statement_t
+{
+    POOL_ELEMENT;
+    struct statement_t *    next;
+    uint32_t                type;
+
+    union
+    {
+        struct exp_node_t * expression;
+        struct object_t *   declaration;
+    };
+};
 
 struct base_statement_t
 {
@@ -602,6 +625,8 @@ struct parser_t
     struct pool_t               types;
     struct pool_t               declarators;
     struct pool_t               exp_nodes;
+    struct pool_t               statements;
+    struct pool_t               exp_trees;
 
     uint32_t                    param_list_level;
     uint32_t                    aggregate_level;

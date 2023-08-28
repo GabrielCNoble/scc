@@ -3,7 +3,6 @@
 #include "tok.h"
 #include "scope.h"
 #include "obj.h"
-#include "exp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +28,7 @@ char *type_specifier_strings[] = {
     // TYPE_SPECIFIER_UNKNOWN,
 };
 
-static char tag[8192];
+static char identifier[8192];
 
 uint32_t decl_specifier_lut[] = {
     [TOKEN_KEYWORD_INT]         = DECL_SPEC_INT,
@@ -363,6 +362,8 @@ void parse(char *text)
     parser.types = pool_CreateTyped(struct type_t, 4096);
     parser.declarators = pool_CreateTyped(struct declarator_t, 4096);
     parser.exp_nodes = pool_CreateTyped(struct exp_node_t, 4096);
+    parser.statements = pool_CreateTyped(struct statement_t, 4096);
+    parser.exp_trees = pool_CreateTyped(struct exp_tree_t, 4096);
     do
     {
         parse_statement(&parser); 
@@ -373,6 +374,8 @@ void parse(char *text)
     pool_Destroy(&parser.types);
     pool_Destroy(&parser.declarators);
     pool_Destroy(&parser.exp_nodes);
+    pool_Destroy(&parser.statements);
+    pool_Destroy(&parser.exp_trees);
 }
 
 // uint32_t valid_type_specifier_lut[] = {
@@ -535,8 +538,13 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags)
         {
             /* declarator: identifier, function, array, pointer, etc... */
             struct declarator_t *declarator = parse_declarator(parser, NULL, flags);
-            struct type_t *declarator_type = declarator->type;
 
+            if(declarator == NULL)
+            {
+                break;
+            }
+
+            struct type_t *declarator_type = declarator->type;
             if(declarator_type != NULL)
             {
                 while(declarator_type->next != NULL)
@@ -631,74 +639,13 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags)
                     error(parser->cur_token.line, parser->cur_token.column, "Expected ';', or '='");
                 }
             }
-
-            // if(parser->cur_token.type == TOKEN_PUNCTUATOR)
-            // {
-            //     if(parser->cur_token.name == TOKEN_PUNCTUATOR_EQUAL)
-            //     {
-            //         if(parser->declaration_depth != 1)
-            //         {
-            //             // if(flags & PARSER_FLAG_ARG_LIST)
-            //             // {
-            //             //     error(parser->cur_token.line, parser->cur_token.column, "Can't assign to function parameter");
-            //             // }
-            //         }
-
-            //         break;
-            //     }
-
-            //     if(parser->cur_token.name == TOKEN_PUNCTUATOR_COMMA)
-            //     {
-            //         if(flags & PARSER_FLAG_ARG_LIST)
-            //         {
-            //             /* we're currently parsing the argument list of a function. However, paramaters need to 
-            //             have a full declaration, and so we need to gtfo here so the caller can handle the ',' token
-            //             and call us again, so we can apply the parsing for an entire declaration. */
-            //             break;
-            //         }
-            //         else
-            //         {
-            //             advance_token(parser);
-
-            //             if(parser->cur_token.type != TOKEN_IDENTIFIER && !is_type_qualifier(&parser->cur_token))
-            //             {
-            //                 error(parser->cur_token.line, parser->cur_token.column, "Expected declarator");
-            //             }
-            //         }
-            //     }
-            //     else if(!(flags & PARSER_FLAG_ARG_LIST) && parser->cur_token.name == TOKEN_PUNCTUATOR_SEMICOLON)
-            //     {
-            //         /* end of declaration */
-            //         advance_token(parser);
-            //         break;
-            //     }
-            //     else if((flags & (PARSER_FLAG_ARG_LIST | PARSER_FLAG_TYPE_NAME)) && parser->cur_token.name == TOKEN_PUNCTUATOR_CPARENTHESIS)
-            //     {
-            //         /* end of function parameter list or type name */
-            //         break;
-            //     }
-            //     else if(parser->cur_token.name == TOKEN_PUNCTUATOR_OBRACE)
-            //     {
-            //         /* we found what's probably the function body, so'll gtfo here so the caller handles it */
-            //         break;
-            //     }
-            //     else
-            //     {
-            //         if(flags & PARSER_FLAG_ARG_LIST)
-            //         {
-            //             error(parser->cur_token.line, parser->cur_token.column, "Expecting ',' token");
-            //         }
-            //         else
-            //         {
-            //             error(parser->cur_token.line, parser->cur_token.column, "Expecting ',', ';' or '='");
-            //         }
-            //     }
-            // }
-            // else
-            // {
-            //     error(parser->cur_token.line, parser->cur_token.column, "Missing ';' after declaration");
-            // }
         }
+    }
+
+    if(declarators != NULL && type == NULL)
+    {
+        /* we found declarators but no type specifiers */
+        error(parser->cur_token.line, parser->cur_token.column, "Expecting declaration specifiers");
     }
 
     parser->declaration_depth--;
@@ -816,7 +763,6 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
 
     if(declarator == NULL)
     {
-        // declarator = calloc(1, sizeof(struct declarator_t ));
         declarator = pool_AddElement(&parser->declarators, NULL);
     }
 
@@ -925,6 +871,14 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                 {
                     error(parser->cur_token.line, parser->cur_token.column, "Expecting ')' token");
                 }
+            }
+        break;
+
+        default:
+            if(!(flags & (PARSER_FLAG_TYPE_NAME | PARSER_FLAG_ARG_LIST)))
+            {
+                /* a direct-declarator is supposed to have an identifier */
+                error(parser->cur_token.line, parser->cur_token.column, "Expecting identifier or '(");
             }
         break;
     }
@@ -1040,7 +994,7 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                     //     advance_token(parser);
                     // }
 
-                    struct exp_node_t *assign_exp = assignment_exp(parser);
+                    struct exp_node_t *assign_exp = parse_assignment_exp(parser);
                 }
 
                 if(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_CBRACKET)
@@ -1063,37 +1017,6 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
         {
             temp_type->next = type;
             type = temp_type;
-
-            // if(type == NULL)
-            // {
-            //     // type = calloc(1, sizeof(struct type_t));
-            //     // type = pool_AddElement(&parser->types, NULL);
-            //     type = temp_type;
-            // }
-            // else
-            // {
-            //     // last_pointer->next = temp_type;
-            //     temp_type->next = type;
-            // }
-
-            // type->type = temp_type.type;
-            // type->complete = temp_type.complete;
-
-            // switch(temp_type.type)
-            // {
-            //     case TYPE_STRUCT:
-            //     case TYPE_UNION:
-            //         type->aggregate = temp_type.aggregate;
-            //     break;
-
-            //     case TYPE_ARRAY:
-            //         type->array = temp_type.array;
-            //     break;
-
-            //     case TYPE_FUNCTION:
-            //         type->func = temp_type.func;
-            //     break;
-            // }
         }
         else
         {
@@ -1102,7 +1025,18 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
 
         if(declarator->type == NULL)
         {
-            declarator->type = type;
+            if(type == NULL && declarator->identifier == NULL && !(flags & (PARSER_FLAG_TYPE_NAME | PARSER_FLAG_ARG_LIST)))
+            {
+                /* if the declarator has no type and no identifier, and we're not handling function parameters or
+                type names (which doesn't need an identifier), we get rid of the declarator here, because this is likely
+                a null expression */
+                pool_RemoveElement(&parser->declarators, declarator->element_index);
+                declarator = NULL;
+            }
+            else
+            {
+                declarator->type = type;
+            }
         }
         else
         {
@@ -1148,13 +1082,13 @@ struct type_t *parse_aggregate_declaration(struct parser_t *parser)
     /* optional tag */
     if(parser->cur_token.type == TOKEN_IDENTIFIER)
     {
-        strncpy(tag, parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
-        tag[parser->cur_token.constant.string_length] = '\0';
+        strncpy(identifier, parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
+        identifier[parser->cur_token.constant.string_length] = '\0';
 
         type = parser->aggregate_types;
         while(type != NULL)
         {
-            if(!strcmp(type->aggregate.identifier, tag))
+            if(!strcmp(type->aggregate.identifier, identifier))
             {
                 break;
             }
@@ -1165,7 +1099,7 @@ struct type_t *parse_aggregate_declaration(struct parser_t *parser)
         {
             type = pool_AddElement(&parser->types, NULL);
             type->complete = 0;
-            type->aggregate.identifier = strdup(tag);
+            type->aggregate.identifier = strdup(identifier);
             type->aggregate.stored_next = parser->aggregate_types;
             parser->aggregate_types = type;
         }
@@ -1191,35 +1125,39 @@ struct type_t *parse_aggregate_declaration(struct parser_t *parser)
 
         if(type->complete)
         {
-            error(parser->cur_token.line, parser->cur_token.column, "Redefinition of aggregate type %s", tag);
+            error(parser->cur_token.line, parser->cur_token.column, "Redefinition of aggregate type %s", identifier);
         }
-
-        while(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_CBRACE)
+        
+        do
         {
-            if(!(is_type_specifier(&parser->cur_token) && is_type_qualifier(&parser->cur_token)))
-            {
-                error(parser->cur_token.line, parser->cur_token.column, "Expected type specifier or qualifier");
-            }
             /* parse the fields, which can be structs as well */
             struct declarator_t *field = parse_declaration(parser, 0);
 
-            if(fields == NULL)
+            if(field != NULL)
             {
-                fields = field;
-            }
-            else
-            {
-                last_field->next = field;
-            }
+                if(fields == NULL)
+                {
+                    fields = field;
+                }
+                else
+                {
+                    last_field->next = field;
+                }
 
-            while(field->next != NULL)
-            {
-                field = field->next;
-                type->aggregate.field_count++;
-            }
+                while(field->next != NULL)
+                {
+                    field = field->next;
+                    type->aggregate.field_count++;
+                }
 
-            last_field = field;
+                last_field = field;
+            }
+            else if(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_CBRACE)
+            {
+                error(parser->cur_token.line, parser->cur_token.column, "Expecting '}'");
+            }
         }
+        while(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_CBRACE);
 
         /* '}' */
         advance_token(parser);
@@ -1417,8 +1355,16 @@ void parse_jump_statement(struct parser_t *parser)
 
 void parse_expression_statement(struct parser_t *parser)
 {
-    struct exp_tree_t *exp_tree;
-    exp_tree = parse_exp(parser);
+    struct exp_tree_t *exp_tree = NULL;
+    struct exp_node_t *root = parse_comma_exp(parser);
+
+    if(root != NULL)
+    {
+        exp_tree = pool_AddElement(&parser->exp_trees, NULL);
+        exp_tree->root = root;
+        exp_tree->next = NULL;
+    }
+    // exp_tree = parse_exp(parser);
 
     if(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_SEMICOLON)
     {
@@ -1442,6 +1388,760 @@ void parse_expression_statement(struct parser_t *parser)
         parser->cur_scope->last_expression = exp_tree;
     }
 }
+
+
+struct type_t int_type = {
+    .type = TYPE_PRIMITIVE,
+    .primitive.type = PRIM_TYPE_INT
+};
+
+struct type_t float_type = {
+    .type = TYPE_PRIMITIVE,
+    .primitive.type = PRIM_TYPE_FLOAT
+};
+
+struct type_t literal_type = {
+    .type = TYPE_POINTER,
+    .next = &(struct type_t){
+        .type = TYPE_PRIMITIVE,
+        .primitive.type = PRIM_TYPE_CHAR
+    }
+};
+
+// struct type_t literal_type = {
+//     .type = TYPE_PRIMITIVE,
+//     .pointer = &(struct pointer_t){.count = 1},
+//     .primitive.type = PRIM_TYPE_CHAR
+// };
+
+// struct exp_tree_t *parse_exp(struct parser_t *parser)
+// {
+//     struct exp_tree_t *tree = NULL;
+//     struct exp_node_t *node = comma_exp(parser);
+
+//     if(node != NULL)
+//     {
+//         tree = calloc(1, sizeof(struct exp_tree_t));
+//         tree->root = node;
+//     }
+
+//     return tree;
+// }
+
+struct exp_node_t *parse_comma_exp(struct parser_t *parser)
+{
+    return parse_assignment_exp(parser);
+}
+
+uint32_t is_assignment_token(struct token_t *token)
+{
+    if(token->type == TOKEN_PUNCTUATOR)
+    {
+        switch(token->name)
+        {
+            case TOKEN_PUNCTUATOR_ASSIGN:
+            case TOKEN_PUNCTUATOR_PLUS_ASSIGN:
+            case TOKEN_PUNCTUATOR_MINUS_ASSIGN:
+            case TOKEN_PUNCTUATOR_MUL_ASSIGN:
+            case TOKEN_PUNCTUATOR_DIV_ASSIGN:
+            case TOKEN_PUNCTUATOR_MOD_ASSIGN:
+            case TOKEN_PUNCTUATOR_BW_AND_ASSIGN:
+            case TOKEN_PUNCTUATOR_BW_OR_ASSIGN:
+            case TOKEN_PUNCTUATOR_BW_XOR_ASSIGN:
+                return 1;
+            break;
+        }
+    }
+
+    return 0;
+}
+
+uint32_t assign_exp_node_type_lut[] = {
+    [TOKEN_PUNCTUATOR_ASSIGN]           = EXP_NODE_TYPE_ASSIGN,
+    [TOKEN_PUNCTUATOR_PLUS_ASSIGN]      = EXP_NODE_TYPE_ADD_ASSIGN,
+    [TOKEN_PUNCTUATOR_MINUS_ASSIGN]     = EXP_NODE_TYPE_SUB_ASSIGN,
+    [TOKEN_PUNCTUATOR_MUL_ASSIGN]       = EXP_NODE_TYPE_MUL_ASSIGN,
+    [TOKEN_PUNCTUATOR_DIV_ASSIGN]       = EXP_NODE_TYPE_DIV_ASSIGN,
+    [TOKEN_PUNCTUATOR_MOD_ASSIGN]       = EXP_NODE_TYPE_MOD_ASSIGN,
+    [TOKEN_PUNCTUATOR_BW_AND_ASSIGN]    = EXP_NODE_TYPE_AND_ASSIGN,
+    [TOKEN_PUNCTUATOR_BW_OR_ASSIGN]     = EXP_NODE_TYPE_OR_ASSIGN,
+    [TOKEN_PUNCTUATOR_BW_XOR_ASSIGN]    = EXP_NODE_TYPE_XOR_ASSIGN,
+};
+
+struct exp_node_t *parse_assignment_exp(struct parser_t *parser)
+{
+    /* I'm not entirely sure about this. The assignment-expression can produce either
+    "conditional expression" or a "unary-expression op assignment-expression". It'd seem
+    like backtracking would be necessary to choose which production rule to use, but I
+    guess checking if the result of this call is an lvalue is enough to choose the proper
+    rule. I guess this is fine, since "conditional-expression" can also derive "unary-expression". */
+    struct exp_node_t *left_exp = parse_conditional_exp(parser);    
+
+    if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+    {
+        if(is_assignment_token(&parser->cur_token))
+        {
+            if(!left_exp->lvalue)
+            {
+                error(parser->cur_token.line, parser->cur_token.column, "Can't assign to a non-lvalue");
+            }
+
+            struct exp_node_t *assign_exp = pool_AddElement(&parser->exp_nodes, NULL);
+            assign_exp->type = assign_exp_node_type_lut[parser->cur_token.name];
+
+            /* '=', '+=', '-=', '*=', '/=', '%=', '&=', '|=', '^=' */
+            advance_token(parser);
+            
+            assign_exp->left = left_exp;
+            assign_exp->right = parse_assignment_exp(parser);
+            assign_exp->lvalue = 0;
+            assign_exp->value = left_exp->value;
+            left_exp = assign_exp;
+        }
+    }
+
+    return left_exp;
+}
+
+struct exp_node_t *parse_conditional_exp(struct parser_t *parser)
+{
+    return parse_logical_or_exp(parser);
+}
+
+struct exp_node_t *parse_logical_or_exp(struct parser_t *parser)
+{
+    return parse_logical_and_exp(parser);
+}
+
+struct exp_node_t *parse_logical_and_exp(struct parser_t *parser)
+{
+    return parse_or_exp(parser);
+}
+
+struct exp_node_t *parse_or_exp(struct parser_t *parser)
+{
+    return parse_xor_exp(parser);
+}
+
+struct exp_node_t *parse_xor_exp(struct parser_t *parser)
+{
+    return parse_and_exp(parser);
+}
+
+struct exp_node_t *parse_and_exp(struct parser_t *parser)
+{
+    return parse_equality_exp(parser);
+}
+
+struct exp_node_t *parse_equality_exp(struct parser_t *parser)
+{
+    return parse_relational_exp(parser);
+}
+
+struct exp_node_t *parse_relational_exp(struct parser_t *parser)
+{
+    return parse_shift_exp(parser);
+}
+
+uint32_t shift_exp_node_type_lut[] = {
+    [TOKEN_PUNCTUATOR_LEFT_SHIFT] = EXP_NODE_TYPE_SHIFT_LEFT,
+    [TOKEN_PUNCTUATOR_RIGHT_SHIFT] = EXP_NODE_TYPE_SHIFT_RIGHT,
+};
+
+struct exp_node_t *parse_shift_exp(struct parser_t *parser)
+{
+    struct exp_node_t *left_exp;
+    left_exp = parse_additive_exp(parser);
+
+    // if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+    // {
+    //     switch(parser->cur_token.name)
+    //     {
+    //         case TOKEN_PUNCTUATOR_LEFT_SHIFT:
+    //         case TOKEN_PUNCTUATOR_RIGHT_SHIFT:
+    //         {
+    //             struct exp_node_t *shift_exp = calloc(1, sizeof(struct exp_node_t));
+    //             shift_exp->type = EXP_NODE_TYPE_SHIFT;
+    //             shift_exp->sub_type = shift_exp_node_type_lut[parser->cur_token.name];
+    //             advance_token(parser);
+    //             shift_exp->left = left_exp;
+    //             shift_exp->right = additive_exp(parser);
+    //             left_exp = shift_exp;        
+    //         }
+    //         break;
+    //     }
+    // }
+
+    return left_exp;
+}
+
+
+uint32_t additive_exp_node_type_lut[] = {
+    [TOKEN_PUNCTUATOR_PLUS] = EXP_NODE_TYPE_ADD,
+    [TOKEN_PUNCTUATOR_MINUS] = EXP_NODE_TYPE_SUB,
+};
+
+struct exp_node_t *parse_additive_exp(struct parser_t *parser)
+{
+    struct exp_node_t *left_exp;
+    left_exp = parse_multiplicative_exp(parser);
+    // token = parser->cur_token;
+
+    // if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+    // {
+    //     switch(parser->cur_token.name)
+    //     {
+    //         case TOKEN_PUNCTUATOR_PLUS:
+    //         case TOKEN_PUNCTUATOR_MINUS:
+    //         {
+    //             struct exp_node_t *add_exp = calloc(1, sizeof(struct exp_node_t));
+    //             add_exp->type = EXP_NODE_TYPE_ADDITIVE;
+    //             add_exp->sub_type = additive_exp_node_type_lut[parser->cur_token.name];
+    //             advance_token(parser);
+    //             add_exp->left = left_exp;
+    //             add_exp->right = multiplicative_exp(parser);
+    //             left_exp = add_exp;
+    //         }
+    //         break;
+    //         //     node_type = ADDITIVE_EXP_NODE_TYPE_ADD;
+    //         // break;
+
+    //         // case TOKEN_PUNCTUATOR_MINUS:
+    //         //     node_type = ADDITIVE_EXP_NODE_TYPE_SUB;
+    //         // break;
+
+    //         // default:
+    //         //     has_add = 0;
+    //         // break;
+    //     }
+    // }
+
+//     if(has_add)
+//     {
+//         add_exp = calloc(1, sizeof(struct exp_node_t));
+//         add_exp->left = left_exp;
+//         add_exp->right = multiplicative_exp(parser);
+//         add_exp->type = EXP_NODE_TYPE_ADDITIVE;
+//         add_exp->sub_type = node_type;
+//         left_exp = add_exp;
+//    }
+
+    return left_exp;
+}
+
+uint32_t multiplicative_exp_node_type_lut[] = {
+    [TOKEN_PUNCTUATOR_ASTERISC]     = EXP_NODE_TYPE_MUL,
+    [TOKEN_PUNCTUATOR_SLASH]        = EXP_NODE_TYPE_DIV,
+    [TOKEN_PUNCTUATOR_PERCENT]      = EXP_NODE_TYPE_MOD,
+};
+
+struct exp_node_t *parse_multiplicative_exp(struct parser_t *parser)
+{
+    // struct exp_node_t *mul_exp;
+    struct exp_node_t *left_exp;
+    // struct token_t *token;
+    // uint32_t node_type;
+    // uint32_t has_mult = 0;
+
+    left_exp = parse_cast_exp(parser);
+    // token = parser->cur_token;
+
+    // if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+    // {
+    //     // has_mult = 1;
+    //     switch(parser->cur_token.name)
+    //     {
+    //         case TOKEN_PUNCTUATOR_ASTERISC:
+    //         case TOKEN_PUNCTUATOR_SLASH:
+    //         case TOKEN_PUNCTUATOR_PERCENT:
+    //         {
+    //             struct exp_node_t *mul_exp = calloc(1, sizeof(struct exp_node_t));
+    //             mul_exp->type = EXP_NODE_TYPE_MULTIPLICATIVE;
+    //             mul_exp->sub_type = multiplicative_exp_node_type_lut[parser->cur_token.name];
+    //             advance_token(parser);
+    //             mul_exp->left = left_exp;
+    //             mul_exp->right = cast_exp(parser);
+    //             left_exp = mul_exp;
+    //         }
+    //         break;
+
+    //         // case TOKEN_PUNCTUATOR_SLASH:
+    //         //     node_type = MULTIPLICATIVE_EXP_NODE_TYPE_DIV;
+    //         // break;
+
+    //         // case TOKEN_PUNCTUATOR_PERCENT:
+    //         //     node_type = MULTIPLICATIVE_EXP_NODE_TYPE_MOD;
+    //         // break;
+
+    //         // default:
+    //         //     has_mult = 0;
+    //         // break;
+    //     }
+    // }
+
+    // if(has_mult)
+    // {
+    //     advance_token(parser);
+    //     // mul_exp = (struct multiplicative_exp_node_t *)new_node(EXP_NODE_TYPE_MULTIPLICATIVE);
+    //     mul_exp = calloc(1, sizeof(struct exp_node_t));
+    //     mul_exp->type = EXP_NODE_TYPE_MULTIPLICATIVE;
+    //     mul_exp->sub_type = node_type;
+    //     mul_exp->left = left_exp;
+    //     mul_exp->right = cast_exp(parser);
+    //     left_exp = mul_exp;
+    // }
+
+    return left_exp;
+}
+
+struct exp_node_t *parse_cast_exp(struct parser_t *parser)
+{
+    struct exp_node_t *exp;
+
+    if(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_OPARENTHESIS)
+    {
+        /* ( */
+        advance_token(parser);
+        struct declarator_t *type_name = parse_declaration(parser, PARSER_FLAG_TYPE_NAME);
+
+        if(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_CPARENTHESIS)
+        {
+            error(parser->cur_token.line, parser->cur_token.column, "Expecting ')' token");
+        }
+
+        advance_token(parser);
+        exp = parse_cast_exp(parser);
+        exp->lvalue = 0;
+
+        if(exp == NULL)
+        {
+            error(parser->cur_token.line, parser->cur_token.column, "Expecting expression");
+        }
+    }
+    else
+    {
+        exp = parse_unary_exp(parser);
+    }
+
+    return exp;
+}
+
+
+// uint32_t unary_exp_node_type_lut[] = {
+//     [TOKEN_PUNCTUATOR_ASTERISC] = 
+// };
+
+uint32_t is_unary_token(struct token_t *token)
+{
+    if(token->type == TOKEN_PUNCTUATOR)
+    {
+        switch(token->name)
+        {
+            case TOKEN_PUNCTUATOR_INCREMENT:
+            case TOKEN_PUNCTUATOR_DECREMENT:
+            case TOKEN_PUNCTUATOR_AMPERSAND:
+            case TOKEN_PUNCTUATOR_ASTERISC:
+            case TOKEN_PUNCTUATOR_PLUS:
+            case TOKEN_PUNCTUATOR_MINUS:
+            case TOKEN_PUNCTUATOR_TILDE:
+            case TOKEN_PUNCTUATOR_EXCLAMATION:
+                return 1;
+            break;
+        }
+    }
+    else if(token->type == TOKEN_KEYWORD && token->name == TOKEN_KEYWORD_SIZEOF)
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+struct exp_node_t *parse_unary_exp(struct parser_t *parser)
+{
+    struct token_t *token;
+    struct exp_node_t *un_exp = NULL;
+    uint32_t node_type;
+    uint32_t has_unary = 0;
+
+    // token = parser->cur_token;
+
+    // switch(parser->cur_token.type)
+    // {
+    //     case TOKEN_KEYWORD:
+    //         has_unary = 1;
+    //         switch(parser->cur_token.name)
+    //         {
+    //             case TOKEN_KEYWORD_SIZEOF:
+    //                 node_type = UNARY_EXP_NODE_TYPE_SIZEOF;
+    //             break;
+    //         }
+    //     break;
+
+    //     case TOKEN_PUNCTUATOR:
+    //         has_unary = 1;
+    //         switch(parser->cur_token.name)
+    //         {
+    //             case TOKEN_PUNCTUATOR_ASTERISC:
+    //                 node_type = UNARY_EXP_NODE_TYPE_DEREFERENCE;
+    //             break;
+
+    //             case TOKEN_PUNCTUATOR_PLUS:
+    //                 node_type = UNARY_EXP_NODE_TYPE_PLUS;
+    //             break;
+
+    //             case TOKEN_PUNCTUATOR_MINUS:
+    //                 node_type = UNARY_EXP_NODE_TYPE_MINUS;
+    //             break;
+
+    //             case TOKEN_PUNCTUATOR_AMPERSAND:
+    //                 node_type = UNARY_EXP_NODE_TYPE_ADDRESS_OF;
+    //             break;
+
+    //             case TOKEN_PUNCTUATOR_INCREMENT:
+    //                 node_type = UNARY_EXP_NODE_TYPE_INCREMENT;
+    //             break;
+
+    //             case TOKEN_PUNCTUATOR_DECREMENT:
+    //                 node_type = UNARY_EXP_NODE_TYPE_DECREMENT;
+    //             break;
+
+    //             case TOKEN_PUNCTUATOR_EXCLAMATION:
+    //                 node_type = UNARY_EXP_NODE_TYPE_LOGICAL_NOT;
+    //             break;
+
+    //             case TOKEN_PUNCTUATOR_TILDE:
+    //                 node_type = UNARY_EXP_NODE_TYPE_BITWISE_NOT;
+    //             break;
+
+    //             default:
+    //                 has_unary = 0;
+    //             break;
+    //         }
+    //     break;
+    // } 
+
+    // if(has_unary)
+    // {
+    //     advance_token(parser);
+    //     un_exp = calloc(1, sizeof(struct exp_node_t));
+    //     un_exp->type = EXP_NODE_TYPE_UNARY;
+    //     un_exp->sub_type = node_type;
+    //     un_exp->left = unary_exp(parser);
+    // }
+    // else
+    {
+        un_exp = parse_postfix_exp(parser);
+    }
+
+    return un_exp;
+}
+
+uint32_t is_postfix_token(struct token_t *token)
+{
+    if(token->type == TOKEN_PUNCTUATOR)
+    {
+        switch(token->name)
+        {
+            case TOKEN_PUNCTUATOR_OPARENTHESIS:
+            case TOKEN_PUNCTUATOR_OBRACKET:
+            case TOKEN_PUNCTUATOR_INCREMENT:
+            case TOKEN_PUNCTUATOR_DECREMENT:
+            case TOKEN_PUNCTUATOR_DOT:
+            case TOKEN_PUNCTUATOR_ARROW:
+                return 1;
+            break;
+        }
+    }
+
+    return 0;
+}
+
+uint32_t postfix_exp_node_type_lut[] = {
+    [TOKEN_PUNCTUATOR_OPARENTHESIS]     = EXP_NODE_TYPE_FUNC_CALL,
+    [TOKEN_PUNCTUATOR_OBRACKET]         = EXP_NODE_TYPE_ARRAY_INDEX,
+    [TOKEN_PUNCTUATOR_INCREMENT]        = EXP_NODE_TYPE_POS_INCREMENT,
+    [TOKEN_PUNCTUATOR_DECREMENT]        = EXP_NODE_TYPE_POS_DECREMENT,
+    [TOKEN_PUNCTUATOR_DOT]              = EXP_NODE_TYPE_DOT,
+    [TOKEN_PUNCTUATOR_ARROW]            = EXP_NODE_TYPE_ARROW
+};
+
+struct exp_node_t *parse_postfix_exp(struct parser_t *parser)
+{
+    struct exp_node_t *left_exp;
+
+    left_exp = parse_primary_exp(parser);
+
+    // if(is_postfix_token(&parser->cur_token))
+    while(is_postfix_token(&parser->cur_token))
+    {
+        struct exp_node_t *pos_exp = pool_AddElement(&parser->exp_nodes, NULL);
+        pos_exp->left = NULL;
+        pos_exp->right = NULL;
+        pos_exp->type = postfix_exp_node_type_lut[parser->cur_token.name];
+        advance_token(parser);
+
+        switch(pos_exp->type)
+        {
+            case EXP_NODE_TYPE_ARRAY_INDEX:
+            {
+                struct type_t *pointed_type = left_exp->effective_type->next;
+
+                if(left_exp->effective_type->type == TYPE_POINTER)
+                {
+                    if(!pointed_type->complete)
+                    {
+                        error(parser->cur_token.line, parser->cur_token.column, "Can't index array of incomplete type");
+                    }
+                }
+                else
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Type is not indexable");
+                }
+
+                struct exp_node_t *exp = parse_comma_exp(parser);
+
+                if(parser->cur_token.type != TOKEN_PUNCTUATOR || parser->cur_token.name != TOKEN_PUNCTUATOR_CBRACKET)
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Expected ']'");
+                }
+
+                if(exp == NULL)
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Expected expression");
+                }
+
+                if(exp->effective_type->type != TYPE_PRIMITIVE || (exp->effective_type->primitive.type != PRIM_TYPE_INT &&
+                                                                   exp->effective_type->primitive.type != PRIM_TYPE_UINT))
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Array index must be an integer");
+                }
+
+                /* ...] */
+                advance_token(parser);
+
+                pos_exp->left = left_exp;
+                pos_exp->right = exp;
+                pos_exp->effective_type = pointed_type;
+                pos_exp->lvalue = 1;
+            }
+            break;
+
+            case EXP_NODE_TYPE_DOT:
+            {
+                if(parser->cur_token.type != TOKEN_IDENTIFIER)
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Expected identifier");
+                }
+
+                struct type_t *type = left_exp->effective_type;
+
+                if(type->type != TYPE_AGGREGATE)
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Type is not a struct nor union");
+                }
+
+                strncpy(identifier, parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
+                identifier[parser->cur_token.constant.string_length] = '\0';
+
+                struct declarator_t *field = type->aggregate.fields;
+
+                while(field)
+                {
+                    if(!strcmp(field->identifier, identifier))
+                    {
+                        break;
+                    }
+                    field = field->next;
+                }
+
+                if(field == NULL)
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Aggregate type has no field named \"%s\"", identifier);
+                }
+
+                /* identifier */
+                advance_token(parser);
+
+                pos_exp->left = left_exp;
+                pos_exp->effective_type = field->type;
+                pos_exp->lvalue = 1;
+            }
+            break;
+        }
+
+        left_exp = pos_exp;
+    }
+
+    // if(parser->cur_token.type == TOKEN_PUNCTUATOR)
+    // {
+        // has_postfix = 1;
+        // switch(parser->cur_token.name)
+        // {
+        //     // case TOKEN_PUNCTUATOR_OPARENTHESIS:
+        //     //     node_type = POSTFIX_EXP_NODE_TYPE_FUNC_CALL;
+        //     // break;
+
+        //     case TOKEN_PUNCTUATOR_OBRACKET:
+        //         node_type = POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX;
+        //     break;
+
+        //     // case TOKEN_PUNCTUATOR_INCREMENT:
+        //     //     node_type = POSTFIX_EXP_NODE_TYPE_INCREMENT;
+        //     // break;
+
+        //     // case TOKEN_PUNCTUATOR_DECREMENT:
+        //     //     node_type = POSTFIX_EXP_NODE_TYPE_DECREMENT;
+        //     // break;
+
+        //     // case TOKEN_PUNCTUATOR_DOT:
+        //     //     node_type = POSTFIX_EXP_NODE_TYPE_DOT;
+        //     // break;
+
+        //     // case TOKEN_PUNCTUATOR_ARROW:
+        //     //     node_type = POSTFIX_EXP_NODE_TYPE_ARROW;
+        //     // break;
+
+        //     // default:
+        //     //     has_postfix = 0;
+        //     // break;
+        // }
+    // }
+
+    // if(has_postfix)
+    // {
+    //     advance_token(parser);
+    //     pos_exp = calloc(1, sizeof(struct exp_node_t));
+    //     pos_exp->type = EXP_NODE_TYPE_POSTFIX;
+    //     pos_exp->sub_type = node_type;
+    //     pos_exp->left = left_exp;
+    //     if(node_type == POSTFIX_EXP_NODE_TYPE_FUNC_CALL || node_type == POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX)
+    //     {
+    //         pos_exp->right = comma_exp(parser);
+    //         advance_token(parser);
+    //     }
+    //     else
+    //     {
+    //         pos_exp->right = postfix_exp(parser);
+    //     }
+
+    //     left_exp = pos_exp;
+    // }
+
+    return left_exp;
+}
+
+uint32_t is_primary_token(struct parser_t *parser)
+{
+    return parser->cur_token.type == TOKEN_IDENTIFIER ||
+           parser->cur_token.type == TOKEN_CONSTANT ||
+           parser->cur_token.type == TOKEN_STRING_LITERAL ||
+           (parser->cur_token.type == TOKEN_PUNCTUATOR && 
+            parser->cur_token.name == TOKEN_PUNCTUATOR_OPARENTHESIS);
+}
+
+struct exp_node_t *parse_primary_exp(struct parser_t *parser)
+{
+    struct exp_node_t *node = NULL;
+
+    if(parser->cur_token.type != TOKEN_EOF)
+    {
+        switch(parser->cur_token.type)
+        {
+            case TOKEN_IDENTIFIER:
+            {
+                // node = calloc(1, sizeof(struct exp_node_t));
+                node = pool_AddElement(&parser->exp_nodes, NULL);
+                node->type = EXP_NODE_TYPE_IDENTIFIER;
+                // node->sub_type = PRIMARY_EXP_NODE_TYPE_IDENTIFIER;
+                strncpy(identifier, parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
+                identifier[parser->cur_token.constant.string_length] = '\0';
+                node->value.object = get_object(parser, identifier);
+                node->lvalue = 1;
+
+                if(node->value.object == NULL)
+                {
+                    error(parser->cur_token.line, parser->cur_token.column, "Undeclared indentifier '%s'", identifier);
+                }
+
+                struct type_t *type = node->value.object->declarator->type;
+
+                if(type->type == TYPE_ARRAY)
+                {
+                    /* arrays decay into pointers */
+                    struct type_t *pointer_type = pool_AddElement(&parser->types, NULL);
+                    pointer_type->type = TYPE_POINTER;
+                    pointer_type->next = type->next;
+                    type = pointer_type;
+                }
+
+                node->effective_type = type;
+                advance_token(parser);
+            }
+            break;
+
+            case TOKEN_CONSTANT:
+                node = pool_AddElement(&parser->exp_nodes, NULL);
+                node->type = EXP_NODE_TYPE_CONSTANT;
+                node->lvalue = 0;
+                // node->effective_type = calloc(1, sizeof(struct type_t));
+                // node->sub_type = PRIMARY_EXP_NODE_TYPE_CONSTANT;
+                switch(parser->cur_token.name)
+                {
+                    case TOKEN_CONSTANT_INTEGER:
+                        node->value.constant.int_constant = parser->cur_token.constant.int_constant;
+                        node->effective_type = &int_type;
+                        // node->effective_type->type = TYPE_PRIMITIVE;
+                        // node->effective_type->primitive.type = PRIM_TYPE_INT;
+                    break;
+
+                    case TOKEN_CONSTANT_FLOAT:
+                        node->value.constant.float_constant = parser->cur_token.constant.float_constant;
+                        node->effective_type = &float_type;
+                        // node->effective_type->type = TYPE_PRIMITIVE;
+                        // node->effective_type->primitive.type = PRIM_TYPE_FLOAT;
+                    break;
+                }
+                advance_token(parser);
+            break;
+
+            case TOKEN_STRING_LITERAL:
+                node = pool_AddElement(&parser->exp_nodes, NULL);
+                node->type = EXP_NODE_TYPE_LITERAL;
+                node->lvalue = 1;
+                // node->sub_type = PRIMARY_EXP_NODE_TYPE_STRING_LITERAL;
+                node->value.constant.string_constant = strndup(parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
+                node->effective_type = &literal_type;
+                // node->effective_type = calloc(1, sizeof(struct type_t));
+                // node->effective_type->
+                advance_token(parser);
+            break;
+
+            case TOKEN_PUNCTUATOR:
+                if(parser->cur_token.name == TOKEN_PUNCTUATOR_OPARENTHESIS)
+                {
+                    // node = calloc(1, sizeof(struct exp_node_t));
+                    // node->sub_type = PRIMARY_EXP_NODE_TYPE_EXPRESSION;
+                    /* (... */
+                    advance_token(parser);
+
+                    node = parse_comma_exp(parser);
+                    /* ...) */
+                    advance_token(parser);
+                }
+            break;
+        }
+
+        // if(node != NULL)
+        // {
+        //     node->type = EXP_NODE_TYPE_PRIMARY;
+        // }
+    }
+
+    return node;
+}
+
+
 
 void dump_scope(struct parser_t *parser, struct scope_t *scope, uint32_t depth)
 {

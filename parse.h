@@ -91,6 +91,48 @@ void parse_jump_statement(struct parser_t *parser);
 
 void parse_expression_statement(struct parser_t *parser);
 
+struct exp_node_t *parse_comma_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_assignment_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_conditional_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_logical_or_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_logical_and_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_or_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_xor_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_and_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_equality_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_relational_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_shift_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_additive_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_multiplicative_exp(struct parser_t *parser);
+
+struct exp_node_t *parse_cast_exp(struct parser_t *parser);
+
+uint32_t is_unary_token(struct token_t *token);
+
+struct exp_node_t *parse_unary_exp(struct parser_t *parser);
+
+uint32_t is_postfix_token(struct token_t *token);
+
+struct exp_node_t *parse_postfix_exp(struct parser_t *parser);
+
+uint32_t is_primary_token(struct parser_t *parser);
+
+struct exp_node_t *parse_primary_exp(struct parser_t *parser);
+
+
+
 void dump_program(struct parser_t *parser);
 
 
