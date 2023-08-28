@@ -34,7 +34,7 @@ int is_typedef_name(struct token_t *token);
 
 uint32_t type_specifier_from_token(struct token_t *token);
 
-char *type_string(struct base_type_t *type);
+// char *type_string(struct base_type_t *type);
 
 void advance_token(struct parser_t *parser);
 
@@ -71,7 +71,7 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags);
 
 struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator_t *declarator, uint32_t flags);
 
-struct base_type_t *parse_initializer(struct parser_t *parser);
+struct type_t *parse_initializer(struct parser_t *parser);
 
 struct type_t *parse_aggregate_declaration(struct parser_t *parser);
 

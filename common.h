@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "pool.h"
 
 enum CHAR_TYPE
 {
@@ -255,8 +256,7 @@ enum TYPES
     TYPE_PRIMITIVE,
     TYPE_ARRAY,
     TYPE_POINTER,
-    TYPE_STRUCT,
-    TYPE_UNION,
+    TYPE_AGGREGATE,
     TYPE_FUNCTION,
     TYPE_UNKNOWN,
 };
@@ -290,10 +290,11 @@ struct declarator_t;
 
 struct type_t 
 {
+    POOL_ELEMENT;
     struct type_t *                 next;
     uint32_t                        specifiers;
-    struct pointer_t *              pointer;
-    struct pointer_t *              last_pointer;
+    // struct pointer_t *              pointer;
+    // struct pointer_t *              last_pointer;
 
     uint32_t                        type;
     uint32_t                        complete;
@@ -308,6 +309,7 @@ struct type_t
             char *                  identifier;
             struct declarator_t *   fields; 
             uint32_t                field_count; 
+            uint32_t                type;
         } aggregate; 
 
         struct
@@ -332,6 +334,7 @@ struct type_t
 
 struct declarator_t
 {
+    POOL_ELEMENT;
     struct declarator_t *   next;
     char *                  identifier;
     struct type_t *         type;
@@ -343,66 +346,115 @@ struct declarator_t
 ************************************************************
 */
 
-enum EXP_NODE_TYPE
+// enum EXP_NODE_TYPE
+// {
+//     EXP_NODE_TYPE_PRIMARY = 0,
+//     EXP_NODE_TYPE_POSTFIX,           
+//     EXP_NODE_TYPE_UNARY,
+//     EXP_NODE_TYPE_CAST,
+//     EXP_NODE_TYPE_MULTIPLICATIVE,
+//     EXP_NODE_TYPE_ADDITIVE,
+//     EXP_NODE_TYPE_SHIFT,
+//     EXP_NODE_TYPE_END,
+// };
+
+// enum PRIMARY_EXP_NODE_TYPE
+// {
+//     PRIMARY_EXP_NODE_TYPE_IDENTIFIER = 0,
+//     PRIMARY_EXP_NODE_TYPE_STRING_LITERAL,
+//     PRIMARY_EXP_NODE_TYPE_CONSTANT,
+//     // PRIMARY_EXP_NODE_TYPE_INTEGER_CONSTANT,
+//     PRIMARY_EXP_NODE_TYPE_EXPRESSION,
+// };
+
+// enum POSTFIX_EXP_NODE_TYPE
+// {
+//     POSTFIX_EXP_NODE_TYPE_FUNC_CALL = 0,
+//     POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX,
+//     POSTFIX_EXP_NODE_TYPE_INCREMENT,
+//     POSTFIX_EXP_NODE_TYPE_DECREMENT,
+//     POSTFIX_EXP_NODE_TYPE_ARROW,
+//     POSTFIX_EXP_NODE_TYPE_DOT,
+// };
+
+// enum UNARY_EXP_NODE_TYPE
+// {
+//     UNARY_EXP_NODE_TYPE_INCREMENT,
+//     UNARY_EXP_NODE_TYPE_DECREMENT,
+//     UNARY_EXP_NODE_TYPE_ADDRESS_OF,
+//     UNARY_EXP_NODE_TYPE_DEREFERENCE,
+//     UNARY_EXP_NODE_TYPE_PLUS,
+//     UNARY_EXP_NODE_TYPE_MINUS,
+//     UNARY_EXP_NODE_TYPE_BITWISE_NOT,
+//     UNARY_EXP_NODE_TYPE_LOGICAL_NOT,
+//     UNARY_EXP_NODE_TYPE_SIZEOF
+// };
+
+// enum MULTIPLICATIVE_EXP_NODE_TYPE
+// {
+//     MULTIPLICATIVE_EXP_NODE_TYPE_MULT = 0,
+//     MULTIPLICATIVE_EXP_NODE_TYPE_DIV,
+//     MULTIPLICATIVE_EXP_NODE_TYPE_MOD,
+// };
+
+// enum ADDITIVE_EXP_NODE_TYPE
+// {
+//     ADDITIVE_EXP_NODE_TYPE_ADD = 0,
+//     ADDITIVE_EXP_NODE_TYPE_SUB,
+// };
+
+// enum SHIFT_EXP_NODE_TYPE
+// {
+//     SHIFT_EXP_NODE_TYPE_SHIFT_LEFT = 0,
+//     SHIFT_EXP_NODE_TYPE_SHIFT_RIGHT,  
+// };
+
+enum EXP_NODE_TYPES
 {
-    EXP_NODE_TYPE_PRIMARY = 0,
-    EXP_NODE_TYPE_POSTFIX,           
-    EXP_NODE_TYPE_UNARY,
+    EXP_NODE_TYPE_IDENTIFIER,
+    EXP_NODE_TYPE_LITERAL,
+    EXP_NODE_TYPE_CONSTANT,
+
+    EXP_NODE_TYPE_FUNC_CALL,
+    EXP_NODE_TYPE_ARRAY_INDEX,
+    EXP_NODE_TYPE_POS_INCREMENT,
+    EXP_NODE_TYPE_POS_DECREMENT,
+    EXP_NODE_TYPE_ARROW,
+    EXP_NODE_TYPE_DOT,
+
+    EXP_NODE_TYPE_PRE_INCREMENT,
+    EXP_NODE_TYPE_PRE_DECREMENT,
+    EXP_NODE_TYPE_ADDRESS_OF,
+    EXP_NODE_TYPE_DEREFERENCE,
+    EXP_NODE_TYPE_PLUS,
+    EXP_NODE_TYPE_MINUS,
+    EXP_NODE_TYPE_BITWISE_NOT,
+    EXP_NODE_TYPE_LOGICAL_NOT,
+    EXP_NODE_TYPE_SIZEOF,
+
     EXP_NODE_TYPE_CAST,
-    EXP_NODE_TYPE_MULTIPLICATIVE,
-    EXP_NODE_TYPE_ADDITIVE,
-    EXP_NODE_TYPE_SHIFT,
-    EXP_NODE_TYPE_END,
-};
 
-enum PRIMARY_EXP_NODE_TYPE
-{
-    PRIMARY_EXP_NODE_TYPE_IDENTIFIER = 0,
-    PRIMARY_EXP_NODE_TYPE_STRING_LITERAL,
-    PRIMARY_EXP_NODE_TYPE_INTEGER_CONSTANT,
-    PRIMARY_EXP_NODE_TYPE_EXPRESSION,
-};
+    EXP_NODE_TYPE_MUL,
+    EXP_NODE_TYPE_DIV,
+    EXP_NODE_TYPE_MOD,
 
-enum POSTFIX_EXP_NODE_TYPE
-{
-    POSTFIX_EXP_NODE_TYPE_FUNC_CALL = 0,
-    POSTFIX_EXP_NODE_TYPE_ARRAY_INDEX,
-    POSTFIX_EXP_NODE_TYPE_INCREMENT,
-    POSTFIX_EXP_NODE_TYPE_DECREMENT,
-    POSTFIX_EXP_NODE_TYPE_ARROW,
-    POSTFIX_EXP_NODE_TYPE_DOT,
-};
+    EXP_NODE_TYPE_ADD,
+    EXP_NODE_TYPE_SUB,
 
-enum UNARY_EXP_NODE_TYPE
-{
-    UNARY_EXP_NODE_TYPE_INCREMENT,
-    UNARY_EXP_NODE_TYPE_DECREMENT,
-    UNARY_EXP_NODE_TYPE_ADDRESS_OF,
-    UNARY_EXP_NODE_TYPE_DEREFERENCE,
-    UNARY_EXP_NODE_TYPE_PLUS,
-    UNARY_EXP_NODE_TYPE_MINUS,
-    UNARY_EXP_NODE_TYPE_BITWISE_NOT,
-    UNARY_EXP_NODE_TYPE_LOGICAL_NOT,
-    UNARY_EXP_NODE_TYPE_SIZEOF
-};
+    EXP_NODE_TYPE_SHIFT_LEFT,
+    EXP_NODE_TYPE_SHIFT_RIGHT,
 
-enum MULTIPLICATIVE_EXP_NODE_TYPE
-{
-    MULTIPLICATIVE_EXP_NODE_TYPE_MULT = 0,
-    MULTIPLICATIVE_EXP_NODE_TYPE_DIV,
-    MULTIPLICATIVE_EXP_NODE_TYPE_MOD,
-};
-
-enum ADDITIVE_EXP_NODE_TYPE
-{
-    ADDITIVE_EXP_NODE_TYPE_ADD = 0,
-    ADDITIVE_EXP_NODE_TYPE_SUB,
-};
-
-enum SHIFT_EXP_NODE_TYPE
-{
-    SHIFT_EXP_NODE_TYPE_SHIFT_LEFT = 0,
-    SHIFT_EXP_NODE_TYPE_SHIFT_RIGHT,  
+    EXP_NODE_TYPE_ASSIGN,
+    EXP_NODE_TYPE_ADD_ASSIGN,
+    EXP_NODE_TYPE_SUB_ASSIGN,
+    EXP_NODE_TYPE_MUL_ASSIGN,
+    EXP_NODE_TYPE_DIV_ASSIGN,
+    EXP_NODE_TYPE_MOD_ASSIGN,
+    EXP_NODE_TYPE_SHL_ASSIGN,
+    EXP_NODE_TYPE_SHR_ASSIGN,
+    EXP_NODE_TYPE_AND_ASSIGN,
+    EXP_NODE_TYPE_OR_ASSIGN,
+    EXP_NODE_TYPE_XOR_ASSIGN,
 };
 
 struct exp_tree_t
@@ -413,11 +465,18 @@ struct exp_tree_t
 
 struct exp_node_t
 {
+    POOL_ELEMENT;
     struct exp_node_t *     left;
     struct exp_node_t *     right;
     uint32_t                type;
-    uint32_t                sub_type;
-    union constant_t        constant;
+    struct type_t *         effective_type;
+    uint32_t                lvalue;
+
+    union
+    {
+        union constant_t    constant;
+        struct object_t *   object;
+    }                       value;
 };
 
 enum STORAGE_CLASS
@@ -425,6 +484,11 @@ enum STORAGE_CLASS
     STORAGE_CLASS_AUTO = 0,         /* default... */
     STORAGE_CLASS_EXTERN,
     STORAGE_CLASS_STATIC,
+};
+
+struct initializer_t
+{
+
 };
 
 struct object_t
@@ -534,6 +598,10 @@ struct parser_t
     struct token_t              next_token;
 
     uint32_t                    declaration_depth;
+    
+    struct pool_t               types;
+    struct pool_t               declarators;
+    struct pool_t               exp_nodes;
 
     uint32_t                    param_list_level;
     uint32_t                    aggregate_level;

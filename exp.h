@@ -35,9 +35,15 @@ struct exp_node_t *multiplicative_exp(struct parser_t *parser);
 
 struct exp_node_t *cast_exp(struct parser_t *parser);
 
+uint32_t is_unary_token(struct token_t *token);
+
 struct exp_node_t *unary_exp(struct parser_t *parser);
 
+uint32_t is_postfix_token(struct token_t *token);
+
 struct exp_node_t *postfix_exp(struct parser_t *parser);
+
+uint32_t is_primary_token(struct parser_t *parser);
 
 struct exp_node_t *primary_exp(struct parser_t *parser);
 

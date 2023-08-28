@@ -128,7 +128,7 @@ void advance_token(struct parser_t *parser)
 
 struct type_t *stash_aggregate_type(struct parser_t *parser, struct type_t *type)
 {
-    if((type->type == TYPE_STRUCT || type->type == TYPE_UNION) && type->aggregate.identifier != NULL)
+    if(type->aggregate.identifier != NULL)
     {
         struct type_t *stashed_type = get_aggregate_type(parser, type->aggregate.identifier);
 
@@ -360,7 +360,9 @@ void parse(char *text)
     /* prime next token. Current token will be initialized
     by the first call to parse_compound_statement */
     advance_token(&parser);
-
+    parser.types = pool_CreateTyped(struct type_t, 4096);
+    parser.declarators = pool_CreateTyped(struct declarator_t, 4096);
+    parser.exp_nodes = pool_CreateTyped(struct exp_node_t, 4096);
     do
     {
         parse_statement(&parser); 
@@ -368,6 +370,9 @@ void parse(char *text)
     while(parser.cur_token.type != TOKEN_EOF);
 
     dump_program(&parser);
+    pool_Destroy(&parser.types);
+    pool_Destroy(&parser.declarators);
+    pool_Destroy(&parser.exp_nodes);
 }
 
 // uint32_t valid_type_specifier_lut[] = {
@@ -483,20 +488,21 @@ struct declarator_t *parse_declaration(struct parser_t *parser, uint32_t flags)
                 long_count++;
             }
 
+            specifiers = cur_specifiers;
+
             if(specifier == DECL_SPEC_STRUCT || specifier == DECL_SPEC_UNION)
             {
                 type = parse_aggregate_declaration(parser);
                 break;
             }
 
-            specifiers = cur_specifiers;
-
             advance_token(parser);
         }
 
         if(type == NULL)
         {
-            type = calloc(1, sizeof(struct type_t));
+            // type = calloc(1, sizeof(struct type_t));
+            type = pool_AddElement(&parser->types, NULL);
             type->type = TYPE_PRIMITIVE;
             type->complete = 1;
         }
@@ -810,49 +816,70 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
 
     if(declarator == NULL)
     {
-        declarator = calloc(1, sizeof(struct declarator_t ));
+        // declarator = calloc(1, sizeof(struct declarator_t ));
+        declarator = pool_AddElement(&parser->declarators, NULL);
     }
 
     struct type_t *type = NULL;
+    struct type_t *last_pointer = NULL;
 
     /* optional pointer before the direct-declarator... */
     if(parser->cur_token.type == TOKEN_PUNCTUATOR)
     {
         if(parser->cur_token.name == TOKEN_PUNCTUATOR_ASTERISC)
         {
-            type = calloc(1, sizeof(struct type_t));
-            type->type = TYPE_POINTER;
-            type->complete = 1;
-            while(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_ASTERISC)
+            // type = calloc(1, sizeof(struct type_t));
+            // type = pool_AddElement(&parser->types, NULL);
+            // type->type = TYPE_POINTER;
+            // type->complete = 1;
+
+            
+            do
             {
-                struct pointer_t *pointer = calloc(1, sizeof(struct pointer_t));
+                // struct pointer_t *pointer = calloc(1, sizeof(struct pointer_t));
 
-                if(type->pointer == NULL)
-                {
-                    type->pointer = pointer;
-                }
-                else
-                {
-                    type->last_pointer->next = pointer;
-                }
+                // if(type->pointer == NULL)
+                // {
+                //     type->pointer = pointer;
+                // }
+                // else
+                // {
+                //     type->last_pointer->next = pointer;
+                // }
 
-                type->last_pointer = pointer;
+                // type->last_pointer = pointer;
 
                 while(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_ASTERISC)
                 {
-                    pointer->count++;
+                    // pointer->count++;
+                    struct type_t *pointer = pool_AddElement(&parser->types, NULL);
+                    pointer->type = TYPE_POINTER;
+
+                    if(type == NULL)
+                    {
+                        type = pointer;
+                    }
+                    else
+                    {
+                        last_pointer->next = pointer;
+                    }
+
+                    last_pointer = pointer;
+
                     advance_token(parser);
                 }
 
                 while(is_type_qualifier(&parser->cur_token))
                 {
-                    struct decl_spec_t *qualifier = calloc(1, sizeof(struct decl_spec_t));
-                    qualifier->specifier = decl_specifier_lut[parser->cur_token.name];
-                    qualifier->next = pointer->qualifiers;
-                    pointer->qualifiers = qualifier;
+                    // struct decl_spec_t *qualifier = calloc(1, sizeof(struct decl_spec_t));
+                    // qualifier->specifier = decl_specifier_lut[parser->cur_token.name];
+                    // qualifier->next = pointer->qualifiers;
+                    // pointer->qualifiers = qualifier;
+                    last_pointer->specifiers |= 1 << decl_specifier_lut[parser->cur_token.name];
                     advance_token(parser);
                 }
             }
+            while(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_ASTERISC);
         }
         // else
         // {
@@ -907,13 +934,15 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
     direct-abstract-declarator that's not a parenthezised abstract-declarator */
     if(parser->cur_token.type == TOKEN_PUNCTUATOR)
     {
-        struct type_t temp_type = {.type = TYPE_UNKNOWN};
+        // struct type_t temp_type = {.type = TYPE_UNKNOWN};
+        struct type_t *temp_type = pool_AddElement(&parser->types, NULL);
+        temp_type->type = TYPE_UNKNOWN;
 
         /* this declarator may be a function or an array... */
         switch(parser->cur_token.name)
         {
             case TOKEN_PUNCTUATOR_OPARENTHESIS:
-                temp_type.type = TYPE_FUNCTION;
+                temp_type->type = TYPE_FUNCTION;
                 /* ( */
                 advance_token(parser);
 
@@ -923,7 +952,7 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                 //parser->param_list_level++;
 
                 // function_type->args = 0;
-                temp_type.func.arg_count = 0;
+                temp_type->func.arg_count = 0;
 
                 struct declarator_t *args = NULL;
                 struct declarator_t *last_arg = NULL;
@@ -947,7 +976,7 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
 
                             if(arg)
                             {
-                                temp_type.func.arg_count++;
+                                temp_type->func.arg_count++;
 
                                 if(args == NULL)
                                 {
@@ -987,14 +1016,14 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
                     }
                 }
 
-                temp_type.func.args = args;
+                temp_type->func.args = args;
 
                 /* ) */
                 advance_token(parser);
             break;
 
             case TOKEN_PUNCTUATOR_OBRACKET:
-                temp_type.type = TYPE_ARRAY;
+                temp_type->type = TYPE_ARRAY;
 
                 /* [... */
                 advance_token(parser);
@@ -1030,31 +1059,45 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
             // break;
         }
 
-        if(temp_type.type != TYPE_UNKNOWN)
+        if(temp_type->type != TYPE_UNKNOWN)
         {
-            if(type == NULL)
-            {
-                type = calloc(1, sizeof(struct type_t));
-            }
+            temp_type->next = type;
+            type = temp_type;
 
-            type->type = temp_type.type;
-            type->complete = temp_type.complete;
+            // if(type == NULL)
+            // {
+            //     // type = calloc(1, sizeof(struct type_t));
+            //     // type = pool_AddElement(&parser->types, NULL);
+            //     type = temp_type;
+            // }
+            // else
+            // {
+            //     // last_pointer->next = temp_type;
+            //     temp_type->next = type;
+            // }
 
-            switch(temp_type.type)
-            {
-                case TYPE_STRUCT:
-                case TYPE_UNION:
-                    type->aggregate = temp_type.aggregate;
-                break;
+            // type->type = temp_type.type;
+            // type->complete = temp_type.complete;
 
-                case TYPE_ARRAY:
-                    type->array = temp_type.array;
-                break;
+            // switch(temp_type.type)
+            // {
+            //     case TYPE_STRUCT:
+            //     case TYPE_UNION:
+            //         type->aggregate = temp_type.aggregate;
+            //     break;
 
-                case TYPE_FUNCTION:
-                    type->func = temp_type.func;
-                break;
-            }
+            //     case TYPE_ARRAY:
+            //         type->array = temp_type.array;
+            //     break;
+
+            //     case TYPE_FUNCTION:
+            //         type->func = temp_type.func;
+            //     break;
+            // }
+        }
+        else
+        {
+            pool_RemoveElement(&parser->types, temp_type->element_index);
         }
 
         if(declarator->type == NULL)
@@ -1081,12 +1124,17 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
     return declarator;
 }
 
+struct type_t *parse_initializer(struct parser_t *parser)
+{
+
+}
 
 struct type_t *parse_aggregate_declaration(struct parser_t *parser)
 {
     // struct type_t *type = calloc(sizeof(struct type_t), 1);
     struct type_t *type = NULL;
     uint32_t aggregate_type = type_specifier_from_token(&parser->cur_token);
+    uint32_t type_exists = 0;
     // type->type = type_specifier_from_token(&parser->cur_token);
     // type->complete = 0;
     /* struct/union */
@@ -1102,29 +1150,36 @@ struct type_t *parse_aggregate_declaration(struct parser_t *parser)
     {
         strncpy(tag, parser->cur_token.constant.string_constant, parser->cur_token.constant.string_length);
         tag[parser->cur_token.constant.string_length] = '\0';
-        type = get_aggregate_type(parser, tag);
-        if(type != NULL)
+
+        type = parser->aggregate_types;
+        while(type != NULL)
         {
-            if(type->complete)
+            if(!strcmp(type->aggregate.identifier, tag))
             {
-                error(parser->cur_token.line, parser->cur_token.column, "Redefinition of aggregate type %s", tag);
+                break;
             }
+            type = type->aggregate.stored_next;
         }
-        else
+
+        if(type == NULL)
         {
-            type = calloc(sizeof(struct type_t), 1);
+            type = pool_AddElement(&parser->types, NULL);
+            type->complete = 0;
             type->aggregate.identifier = strdup(tag);
-            stash_aggregate_type(parser, type);
+            type->aggregate.stored_next = parser->aggregate_types;
+            parser->aggregate_types = type;
         }
 
         advance_token(parser);
     }
     else
     {
-        type = calloc(sizeof(struct type_t), 1);
+        type = pool_AddElement(&parser->types, NULL);
+        type->complete = 0;
     }
 
-    type->type = aggregate_type;
+    type->type = TYPE_AGGREGATE;
+    type->aggregate.type = aggregate_type;
 
     if(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_OBRACE)
     {
@@ -1134,17 +1189,19 @@ struct type_t *parse_aggregate_declaration(struct parser_t *parser)
         struct declarator_t *fields = NULL;
         struct declarator_t *last_field = NULL;
 
-        while(1)
+        if(type->complete)
         {
-            if(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_CBRACE)
-            {
-                advance_token(parser);
-                break;
-            }
+            error(parser->cur_token.line, parser->cur_token.column, "Redefinition of aggregate type %s", tag);
+        }
 
+        while(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_CBRACE)
+        {
+            if(!(is_type_specifier(&parser->cur_token) && is_type_qualifier(&parser->cur_token)))
+            {
+                error(parser->cur_token.line, parser->cur_token.column, "Expected type specifier or qualifier");
+            }
             /* parse the fields, which can be structs as well */
             struct declarator_t *field = parse_declaration(parser, 0);
-            // struct type_t *last_field = field;
 
             if(fields == NULL)
             {
@@ -1163,6 +1220,9 @@ struct type_t *parse_aggregate_declaration(struct parser_t *parser)
 
             last_field = field;
         }
+
+        /* '}' */
+        advance_token(parser);
 
         type->aggregate.fields = fields;
         type->complete = 1;

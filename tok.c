@@ -443,6 +443,11 @@ struct token_t lex_token(char *text, uint32_t *offset, uint32_t *line, uint32_t 
                     token_name = TOKEN_PUNCTUATOR_COMMA;
                 break;
 
+                case '.':
+                    text_offset++;
+                    token_name = TOKEN_PUNCTUATOR_DOT;
+                break;
+
                 case ';':
                     text_offset++;
                     token_name = TOKEN_PUNCTUATOR_SEMICOLON;
