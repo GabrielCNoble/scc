@@ -4,7 +4,7 @@ struct scope_t *push_scope(struct parser_t *parser)
 {
     // struct scope_t *scope;
 
-    struct scope_t *scope = calloc(sizeof(struct scope_t), 1);
+    struct scope_t *scope = pool_AddElement(&parser->scopes, NULL);
     scope->active = 1;
     if(parser->cur_scope != NULL)
     {

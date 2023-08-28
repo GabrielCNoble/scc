@@ -364,6 +364,8 @@ void parse(char *text)
     parser.exp_nodes = pool_CreateTyped(struct exp_node_t, 4096);
     parser.statements = pool_CreateTyped(struct statement_t, 4096);
     parser.exp_trees = pool_CreateTyped(struct exp_tree_t, 4096);
+    parser.scopes = pool_CreateTyped(struct scope_t, 4096);
+
     do
     {
         parse_statement(&parser); 
@@ -376,6 +378,7 @@ void parse(char *text)
     pool_Destroy(&parser.exp_nodes);
     pool_Destroy(&parser.statements);
     pool_Destroy(&parser.exp_trees);
+    pool_Destroy(&parser.scopes);
 }
 
 // uint32_t valid_type_specifier_lut[] = {
@@ -773,28 +776,9 @@ struct declarator_t *parse_declarator(struct parser_t *parser, struct declarator
     if(parser->cur_token.type == TOKEN_PUNCTUATOR)
     {
         if(parser->cur_token.name == TOKEN_PUNCTUATOR_ASTERISC)
-        {
-            // type = calloc(1, sizeof(struct type_t));
-            // type = pool_AddElement(&parser->types, NULL);
-            // type->type = TYPE_POINTER;
-            // type->complete = 1;
-
-            
+        {   
             do
             {
-                // struct pointer_t *pointer = calloc(1, sizeof(struct pointer_t));
-
-                // if(type->pointer == NULL)
-                // {
-                //     type->pointer = pointer;
-                // }
-                // else
-                // {
-                //     type->last_pointer->next = pointer;
-                // }
-
-                // type->last_pointer = pointer;
-
                 while(parser->cur_token.type == TOKEN_PUNCTUATOR && parser->cur_token.name == TOKEN_PUNCTUATOR_ASTERISC)
                 {
                     // pointer->count++;

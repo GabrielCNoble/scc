@@ -527,13 +527,24 @@ enum STATEMENT_TYPES
 struct statement_t
 {
     POOL_ELEMENT;
-    struct statement_t *    next;
-    uint32_t                type;
+    struct statement_t *            next;
+    uint32_t                        type;
 
     union
     {
-        struct exp_node_t * expression;
-        struct object_t *   declaration;
+        struct exp_node_t *         expression;
+        struct object_t *           declaration;
+
+        struct
+        {
+            
+        }                           compound;
+
+        struct
+        {
+            struct exp_node_t *     expressions[3];
+            struct statement_t *    statement;
+        }                           iteration;
     };
 };
 
@@ -577,6 +588,7 @@ struct switch_statement_t
 
 struct scope_t
 {
+    POOL_ELEMENT;
     struct scope_t *        parent;
     struct scope_t *        children;
     struct scope_t *        last_child;
@@ -603,7 +615,6 @@ enum PARSER_FLAGS
 {
     PARSER_FLAG_ARG_LIST = 1,
     PARSER_FLAG_TYPE_NAME = 1 << 1,
-    // PARSER_FLAG_NO_INIT = 1 << 2
 };
 
 struct parser_t
@@ -627,6 +638,7 @@ struct parser_t
     struct pool_t               exp_nodes;
     struct pool_t               statements;
     struct pool_t               exp_trees;
+    struct pool_t               scopes;
 
     uint32_t                    param_list_level;
     uint32_t                    aggregate_level;
